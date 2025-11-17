@@ -1,5 +1,5 @@
 // src/components/earningsCalendar.js
-import { getWeeklyEarnings } from '../data/earningsService.js';
+import { getWeeklyEarnings, resetEarningsCache } from '../data/earningsService.js';
 import { renderLastUpdatedLine } from './lastUpdated.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -25,8 +25,8 @@ export function initEarningsCalendar() {
 
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
-      // This will call the service again; caching logic in earningsService
-      // decides whether to actually hit Finnhub or use cache.
+      // Clear cache earnings so we force a fresh fetch for the current/next week
+      resetEarningsCache();
       refresh();
     });
   }
