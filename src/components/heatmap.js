@@ -6,32 +6,33 @@ export function renderHeatmap(container, tiles, timeframe) {
 
   container.innerHTML = '';
 
-  // Filter to valid market caps
+  // Filter out anything without a positive market cap
   const valid = tiles.filter(
     (t) => typeof t.marketCap === 'number' && t.marketCap > 0
   );
-  if (!valid.length) return;
 
-  // Sort descending by market cap so big names dominate top-left region
-  const sorted = [...valid].sort((a, b) => b.marketCap - a.marketCap);
-
-  const totalCap = sorted
+  if (!valid.length) {
+    return;
+  }
+  
+  // Normalize market caps into weights
+  const totalCap = valid
     .map((t) => t.marketCap)
     .reduce((a, b) => a + b, 0);
-  if (!totalCap) return;
 
-  const nodes = sorted.map((t) => ({
+  if (!totalCap) return;
+  
+  const nodes = valid.map((t) => ({
     tile: t,
     weight: t.marketCap,
   }));
 
-  // Compute normalized [0,1] treemap rectangles
-  const rects = squarifiedTreemap(nodes, 0, 0, 1, 1);
+  const rects = computeTreemap(nodes, 0, 0, 1, 1, 'vertical');
 
   rects.forEach(({ tile, x, y, w, h }) => {
     const el = document.createElement('div');
 
-    // Pick the right % change based on timeframe, fallback if missing
+    // Prefer timeframe-specific pct, but fall back to whichever exists
     const primary =
       timeframe === '1D' ? tile.changePct1D : tile.changePct1W;
     const fallback =
@@ -58,7 +59,7 @@ export function renderHeatmap(container, tiles, timeframe) {
     const logoHtml = tile.logoUrl
       ? `<img class="tile-logo" src="${tile.logoUrl}" alt="${tile.symbol} logo" />`
       : '';
-
+    
     // New centered column layout: logo (top), ticker (middle), % (bottom)
     el.innerHTML = `
       <div class="tile-content">
@@ -74,7 +75,6 @@ export function renderHeatmap(container, tiles, timeframe) {
 
 function pctColorClass(pct) {
   if (pct == null || Number.isNaN(pct)) return 'pct-neutral';
-
   if (pct > 3) return 'pct-strong-pos';
   if (pct > 0.5) return 'pct-pos';
   if (pct < -3) return 'pct-strong-neg';
@@ -83,189 +83,80 @@ function pctColorClass(pct) {
 }
 
 /**
- * Squarified treemap layout
+ * Simple binary slice treemap:
  * - nodes: [{ tile, weight }]
  * - x, y, w, h: numbers in [0,1] representing the rectangle
+ * - orientation: 'vertical' or 'horizontal'
+ *
  * Returns: [{ tile, x, y, w, h }]
  */
-function squarifiedTreemap(nodes, x, y, w, h) {
-  const result = [];
-  const sorted = nodes.filter((n) => n.weight > 0);
+function computeTreemap(nodes, x, y, w, h, orientation) {
+  const totalWeight = nodes
+    .map((n) => n.weight)
+    .reduce((a, b) => a + b, 0);
 
-  if (!sorted.length) return result;
+  if (!nodes.length || totalWeight <= 0) return [];
 
-  // Already sorted by caller (marketCap desc), but ensure it here
-  sorted.sort((a, b) => b.weight - a.weight);
+  if (nodes.length === 1) {
+    return [
+      {
+        tile: nodes[0].tile,
+        x,
+        y,
+        w,
+        h,
+      },
+    ];
+  }
 
-  function layoutRow(row, rowSum, originX, originY, width, height, horizontal) {
-    const total = rowSum || 1;
-    if (horizontal) {
-      const rowHeight = (rowSum / totalWeight) * hTotal;
-      let xCursor = originX;
-      for (const n of row) {
-        const fraction = n.weight / rowSum;
-        const rw = fraction * width;
-        result.push({
-          tile: n.tile,
-          x: xCursor,
-          y: originY,
-          w: rw,
-          h: rowHeight,
-        });
-        xCursor += rw;
-      }
-      return rowHeight;
+  // Sort descending by weight
+  const sorted = [...nodes].sort((a, b) => b.weight - a.weight);
+
+  // Partition into two groups with roughly equal total weight
+  const groupA = [];
+  const groupB = [];
+  let sumA = 0;
+  const half = totalWeight / 2;
+
+  for (const node of sorted) {
+    if (sumA < half) {
+      groupA.push(node);
+      sumA += node.weight;
     } else {
-      const rowWidth = (rowSum / totalWeight) * wTotal;
-      let yCursor = originY;
-      for (const n of row) {
-        const fraction = n.weight / rowSum;
-        const rh = fraction * height;
-        result.push({
-          tile: n.tile,
-          x: originX,
-          y: yCursor,
-          w: rowWidth,
-          h: rh,
-        });
-        yCursor += rh;
-      }
-      return rowWidth;
+      groupB.push(node);
     }
   }
 
-  // Implementation adapted into a simpler form:
-  // we keep track of "short side" and add items to a row while
-  // it improves aspect ratio, then lay out the row and continue.
+  const weightA = groupA
+    .map((n) => n.weight)
+    .reduce((s, v) => s + v, 0);
+  const weightB = totalWeight - weightA;
 
-  let x0 = x;
-  let y0 = y;
-  let wTotal = w;
-  let hTotal = h;
-  let totalWeight = sorted.reduce((acc, n) => acc + n.weight, 0);
+  let rects = [];
 
-  let row = [];
-  let rowSum = 0;
-  let horizontal = wTotal >= hTotal; // first split along longer side
+  if (orientation === 'vertical') {
+    const wA = (weightA / totalWeight) * w;
+    const wB = w - wA;
 
-  const remaining = [...sorted];
+    rects = rects
+      .concat(
+        computeTreemap(groupA, x, y, wA, h, 'horizontal'),
+      )
+      .concat(
+        computeTreemap(groupB, x + wA, y, wB, h, 'horizontal'),
+      );
+  } else {
+    const hA = (weightA / totalWeight) * h;
+    const hB = h - hA;
 
-  function worstAspect(row, rowSum, shortSide) {
-    if (!row.length || rowSum === 0) return Infinity;
-    let max = -Infinity;
-    let min = Infinity;
-    for (const n of row) {
-      if (n.weight > max) max = n.weight;
-      if (n.weight < min) min = n.weight;
-    }
-    const s2 = shortSide * shortSide;
-    return Math.max((s2 * max) / (rowSum * rowSum), (rowSum * rowSum) / (s2 * min));
+    rects = rects
+      .concat(
+        computeTreemap(groupA, x, y, w, hA, 'vertical'),
+      )
+      .concat(
+        computeTreemap(groupB, x, y + hA, w, hB, 'vertical'),
+      );
   }
 
-  while (remaining.length) {
-    const n = remaining[0];
-    const shortSide = horizontal ? hTotal : wTotal;
-
-    if (!row.length) {
-      row.push(n);
-      rowSum = n.weight;
-      remaining.shift();
-      continue;
-    }
-
-    const currentAspect = worstAspect(row, rowSum, shortSide);
-    const newAspect = worstAspect([...row, n], rowSum + n.weight, shortSide);
-
-    if (newAspect <= currentAspect) {
-      // Adding this node improves or keeps aspect ratio
-      row.push(n);
-      rowSum += n.weight;
-      remaining.shift();
-    } else {
-      // Lay out current row
-      const totalRowWeight = rowSum;
-      const total = totalWeight || 1;
-
-      if (horizontal) {
-        const rowHeight = (totalRowWeight / total) * hTotal;
-        let xCursor = x0;
-        for (const r of row) {
-          const frac = r.weight / totalRowWeight;
-          const rw = frac * wTotal;
-          result.push({
-            tile: r.tile,
-            x: xCursor,
-            y: y0,
-            w: rw,
-            h: rowHeight,
-          });
-          xCursor += rw;
-        }
-        y0 += rowHeight;
-        hTotal -= rowHeight;
-      } else {
-        const rowWidth = (totalRowWeight / total) * wTotal;
-        let yCursor = y0;
-        for (const r of row) {
-          const frac = r.weight / totalRowWeight;
-          const rh = frac * hTotal;
-          result.push({
-            tile: r.tile,
-            x: x0,
-            y: yCursor,
-            w: rowWidth,
-            h: rh,
-          });
-          yCursor += rh;
-        }
-        x0 += rowWidth;
-        wTotal -= rowWidth;
-      }
-
-      totalWeight -= totalRowWeight;
-      row = [];
-      rowSum = 0;
-      horizontal = wTotal >= hTotal;
-    }
-  }
-
-  // Layout any remaining row
-  if (row.length && totalWeight > 0) {
-    const totalRowWeight = rowSum;
-    const total = totalWeight || 1;
-
-    if (horizontal) {
-      const rowHeight = (totalRowWeight / total) * hTotal;
-      let xCursor = x0;
-      for (const r of row) {
-        const frac = r.weight / totalRowWeight;
-        const rw = frac * wTotal;
-        result.push({
-          tile: r.tile,
-          x: xCursor,
-          y: y0,
-          w: rw,
-          h: rowHeight,
-        });
-        xCursor += rw;
-      }
-    } else {
-      const rowWidth = (totalRowWeight / total) * wTotal;
-      let yCursor = y0;
-      for (const r of row) {
-        const frac = r.weight / totalRowWeight;
-        const rh = frac * hTotal;
-        result.push({
-          tile: r.tile,
-          x: x0,
-          y: yCursor,
-          w: rowWidth,
-          h: rh,
-        });
-        yCursor += rh;
-      }
-    }
-  }
-
-  return result;
+  return rects;
 }
