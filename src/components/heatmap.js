@@ -63,21 +63,32 @@ export function renderHeatmap(container, tiles, timeframe) {
     // Expose to CSS as a custom property
     el.style.setProperty('--tile-scale', scale.toString());
 
-    const pctDisplay =
-      pct != null && !Number.isNaN(pct) ? `${pct.toFixed(2)}%` : '--';
+      const pctDisplay =
+    pct != null && !Number.isNaN(pct) ? `${pct.toFixed(2)}%` : '--';
 
-    const logoHtml = tile.logoUrl
-      ? `<img class="tile-logo" src="${tile.logoUrl}" alt="${tile.symbol} logo" />`
-      : '';
-    
-    // New centered column layout: logo (top), ticker (middle), % (bottom)
-    el.innerHTML = `
-      <div class="tile-content">
-        ${logoHtml}
-        <div class="tile-symbol">${tile.symbol}</div>
-        <div class="tile-pct">${pctDisplay}</div>
-      </div>
-    `;
+  const logoHtml = tile.logoUrl
+    ? `<img class="tile-logo" src="${tile.logoUrl}" alt="${tile.symbol} logo" />`
+    : '';
+
+  // Decide whether to show text based on tile scale
+  // If scale < 0.7 → only logo; otherwise logo + symbol + %
+  const showText = scale >= 0.7;
+
+  const symbolHtml = showText
+    ? `<div class="tile-symbol">${tile.symbol}</div>`
+    : '';
+
+  const pctHtml = showText
+    ? `<div class="tile-pct">${pctDisplay}</div>`
+    : '';
+
+  el.innerHTML = `
+    <div class="tile-content">
+      ${logoHtml}
+      ${symbolHtml}
+      ${pctHtml}
+    </div>
+  `;
 
     container.appendChild(el);
   });
