@@ -1,0 +1,32 @@
+/* src/styles/layout.css */
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#view-container {
+  flex: 1;
+  padding: 8px 8px 50px; /* bottom padding to avoid tab bar overlap */
+}
+
+.tab-view {
+  display: none;
+}
+
+.tab-view.active {
+  display: block;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.last-updated {
+  font-size: 11px;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}

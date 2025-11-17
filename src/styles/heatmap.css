@@ -1,0 +1,54 @@
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  grid-auto-rows: 60px;
+  grid-auto-flow: dense;
+  gap: 4px;
+}
+
+.heatmap-tile {
+  border-radius: 4px;
+  padding: 4px;
+  box-sizing: border-box;
+  color: #fff;
+  font-size: 11px;
+}
+
+/* Size classes based on market cap share */
+.heatmap-tile.size-small {
+  grid-column: span 1;
+  grid-row: span 1;
+}
+
+.heatmap-tile.size-medium {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.heatmap-tile.size-large {
+  grid-column: span 3;
+  grid-row: span 3;
+}
+
+.tile-symbol {
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.tile-pct {
+  font-size: 10px;
+  text-align: right;
+}
+
+/* Colors */
+.pct-strong-pos { background: #0b5d16; }
+.pct-pos        { background: #166f24; }
+.pct-neutral    { background: #333; }
+.pct-neg        { background: #7b2520; }
+.pct-strong-neg { background: #a31610; }
+
+body.theme-dark {
+  background-color: #000;
+  color: #eee;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}

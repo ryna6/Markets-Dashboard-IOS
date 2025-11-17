@@ -1,0 +1,72 @@
+.earnings-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.earnings-day-column {
+  background-color: #111;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.earnings-day-header {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.earnings-session-label {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+
+.earnings-company-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.earnings-company-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 4px;
+  background-color: #181818;
+}
+
+.earnings-logo-wrapper {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.earnings-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.earnings-logo-placeholder {
+  width: 100%;
+  height: 100%;
+  background-color: #333;
+  border-radius: 4px;
+}
+
+.earnings-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.earnings-symbol {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.earnings-name {
+  font-size: 10px;
+  color: #aaa;
+}
