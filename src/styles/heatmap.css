@@ -1,54 +1,60 @@
-.heatmap-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-  grid-auto-rows: 60px;
-  grid-auto-flow: dense;
-  gap: 4px;
+/* The outer box that the treemap fills */
+.heatmap-container {
+  position: relative;
+  width: 100%;
+  /* Adjust height to taste; this will fill most of the screen below toolbar */
+  height: calc(100vh - 140px);
+  background-color: #050505;
+  overflow: hidden;
 }
 
+/* Treemap tiles are absolutely positioned rectangles */
 .heatmap-tile {
-  border-radius: 4px;
-  padding: 4px;
+  position: absolute;
   box-sizing: border-box;
-  color: #fff;
-  font-size: 11px;
+  border: 1px solid #111;
+  padding: 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
 }
 
-/* Size classes based on market cap share */
-.heatmap-tile.size-small {
-  grid-column: span 1;
-  grid-row: span 1;
+/* Color classes (you probably already have these) */
+.heatmap-tile.pct-strong-pos {
+  background-color: #019b45;
 }
 
-.heatmap-tile.size-medium {
-  grid-column: span 2;
-  grid-row: span 2;
+.heatmap-tile.pct-pos {
+  background-color: #027a35;
 }
 
-.heatmap-tile.size-large {
-  grid-column: span 3;
-  grid-row: span 3;
+.heatmap-tile.pct-neutral {
+  background-color: #222;
 }
 
+.heatmap-tile.pct-neg {
+  background-color: #8c2e28;
+}
+
+.heatmap-tile.pct-strong-neg {
+  background-color: #b32020;
+}
+
+/* Inner text layout */
 .tile-symbol {
   font-weight: 600;
-  font-size: 11px;
+}
+
+.tile-label {
+  font-size: 9px;
+  opacity: 0.8;
 }
 
 .tile-pct {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   text-align: right;
-}
-
-/* Colors */
-.pct-strong-pos { background: #0b5d16; }
-.pct-pos        { background: #166f24; }
-.pct-neutral    { background: #333; }
-.pct-neg        { background: #7b2520; }
-.pct-strong-neg { background: #a31610; }
-
-body.theme-dark {
-  background-color: #000;
-  color: #eee;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
