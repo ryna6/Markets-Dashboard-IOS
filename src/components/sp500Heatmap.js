@@ -33,7 +33,7 @@ export function initSp500Heatmap() {
           symbol: sym,
           marketCap: marketCaps ? marketCaps[sym] : null,
           changePct1D: q.changePct1D,
-          // changePct1W is unused for S&P; heatmap will use 1D because timeframe='1D'
+          logoUrl: logos ? logos[sym] : null,
         };
       });
 
