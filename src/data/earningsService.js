@@ -5,7 +5,7 @@ import { toEstIso, getCurrentWeekRangeEst, isOlderThanMinutes, } from './timezon
 import { getCompanyProfile } from './companyService.js';
 
 // How many earnings to show per week (biggest by market cap)
-const MAX_EARNINGS_COUNT = 80;
+const MAX_EARNINGS_COUNT = 20;
 const EARNINGS_REFRESH_MINUTES = 60 * 24; // refresh at most once per day per week
 
 let earningsState = {
