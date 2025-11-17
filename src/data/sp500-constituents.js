@@ -43,7 +43,7 @@ export const SP500_CONSTITUENTS = [
   { symbol: 'MRK', name: 'Merck & Co.' },
   { symbol: 'ABT', name: 'Abbott Laboratories' },
   { symbol: 'CRM', name: 'Salesforce' },
-  { symbol: 'MCD', name: 'McDonald's' },
+  { symbol: 'MCD', name: 'McDonalds' },
   { symbol: 'TMO', name: 'Thermo Fisher Scientific' },
   { symbol: 'PEP', name: 'PepsiCo' },
   { symbol: 'LIN', name: 'Linde plc' },
