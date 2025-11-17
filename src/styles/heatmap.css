@@ -14,15 +14,13 @@
   box-sizing: border-box;
   border: 1px solid #111;
   padding: 4px;
-  border-radius: 3px;
-  font-size: 10px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  color: #fff;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+    'Helvetica Neue', Arial, sans-serif;
   overflow: hidden;
 }
 
-/* Color classes (you probably already have these) */
+/* Color classes */
 .heatmap-tile.pct-strong-pos {
   background-color: #019b45;
 }
@@ -43,9 +41,26 @@
   background-color: #b32020;
 }
 
+/* Header row: logo + symbol */
+.tile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.tile-logo {
+  max-height: 14px;
+  max-width: 40px;
+  object-fit: contain;
+  display: block;
+}
+
 /* Inner text layout */
 .tile-symbol {
   font-weight: 600;
+  font-size: 11px;
 }
 
 .tile-label {
