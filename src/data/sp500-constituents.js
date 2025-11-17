@@ -45,12 +45,7 @@ export const SP500_CONSTITUENTS = [
   { symbol: 'CRM', name: 'Salesforce' },
   { symbol: 'MCD', name: 'McDonalds' },
   { symbol: 'TMO', name: 'Thermo Fisher Scientific' },
-  { symbol: 'PEP', name: 'PepsiCo' },
-  { symbol: 'LIN', name: 'Linde plc' },
-  { symbol: 'ISRG', name: 'Intuitive Surgical' },
-  { symbol: 'UBER', name: 'Uber' },
-  { symbol: 'DIS', name: 'Walt Disney Company (The)' }
-  // Top 50 companies based on market cap
+  // Top 45 companies based on market cap
 ];
 
 export const SP500_SYMBOLS = SP500_CONSTITUENTS.map(c => c.symbol);
