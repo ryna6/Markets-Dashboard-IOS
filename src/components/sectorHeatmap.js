@@ -1,8 +1,8 @@
 // src/components/sectorHeatmap.js
-import { getSectorData } from '../data/sectorService.js';
+import { getSectorData, resetSectorCache } from '../data/sectorService.js';
 import { renderHeatmap } from './heatmap.js';
 import { renderLastUpdatedLine } from './lastUpdated.js';
-import { getTimeframe, setTimeframe } from '../main.js';
+import { TIMEFRAMES, TIMEFRAME_STORAGE_KEYS } from '../data/constants.js';
 
 export function initSectorHeatmap() {
   const view = document.getElementById('sectors-view');
@@ -14,22 +14,39 @@ export function initSectorHeatmap() {
   const heatmapEl = view.querySelector('.heatmap-container');
   const lastUpdatedEl = view.querySelector('.last-updated');
   const dropdown = view.querySelector('.timeframe-select');
+  const refreshBtn = view.querySelector('.sectors-refresh-btn');
 
   if (!heatmapEl) {
     console.warn('Sector heatmap container not found');
     return;
   }
 
+  const tfKey =
+    (TIMEFRAME_STORAGE_KEYS && TIMEFRAME_STORAGE_KEYS.sectors) ||
+    'md_sectors_timeframe';
+
+  let currentTimeframe =
+    localStorage.getItem(tfKey) || TIMEFRAMES.ONE_DAY;
+
   if (dropdown) {
-    dropdown.value = getTimeframe();
+    dropdown.value = currentTimeframe;
     dropdown.addEventListener('change', () => {
-      const tf = dropdown.value;
-      setTimeframe(tf);
+      currentTimeframe = dropdown.value;
+      localStorage.setItem(tfKey, currentTimeframe);
+      refresh();
+    });
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      // Clear sector cache and force fresh refetch
+      resetSectorCache();
+      refresh();
     });
   }
 
   async function refresh() {
-    const tf = getTimeframe();
+    const tf = currentTimeframe;
     try {
       const {
         sectors,
@@ -40,18 +57,16 @@ export function initSectorHeatmap() {
         error,
       } = await getSectorData(tf);
 
-      // Build tiles and ALWAYS supply a numeric marketCap (fallback = 1)
       const tiles = sectors.map((s) => {
         const symbol = s.symbol;
         const q = quotes[symbol] || {};
         const w = weeklyChange[symbol] || {};
-
         const cap =
           marketCaps &&
           typeof marketCaps[symbol] === 'number' &&
           marketCaps[symbol] > 0
             ? marketCaps[symbol]
-            : 1; // fallback so treemap still renders tiles
+            : 1;
 
         return {
           symbol,
@@ -62,14 +77,16 @@ export function initSectorHeatmap() {
         };
       });
 
-      // Debug if needed
-      // console.log('Sector tiles', tiles);
-
       renderHeatmap(heatmapEl, tiles, tf);
       renderLastUpdatedLine(lastUpdatedEl, lastQuotesFetch, tf, error);
     } catch (err) {
       console.error('Sector refresh error', err);
-      renderLastUpdatedLine(lastUpdatedEl, null, getTimeframe(), err.message);
+      renderLastUpdatedLine(
+        lastUpdatedEl,
+        null,
+        currentTimeframe,
+        err.message
+      );
     }
   }
 
@@ -77,9 +94,4 @@ export function initSectorHeatmap() {
   refresh();
   // Periodic refresh every 10 minutes
   setInterval(refresh, 10 * 60 * 1000);
-
-  // React to timeframe dropdown changes from other tabs
-  window.addEventListener('timeframe-changed', () => {
-    refresh();
-  });
 }
