@@ -1517,6 +1517,8 @@ export const IMPORTANT_TICKERS = [
 'PDYN',
 'KITT',
 'OPTT',
+'SOUN',
+'SERV'
 'RGTI',
 'QBTS',
 'QUBT',
