@@ -1,6 +1,6 @@
 // src/components/heatmap.js
 
-// tiles: [{ symbol, label?, marketCap?, changePct1D, changePct1W }]
+// tiles: [{ symbol, label?, marketCap?, changePct1D, changePct1W, logoUrl? }]
 export function renderHeatmap(container, tiles, timeframe) {
   if (!container) return;
 
@@ -15,9 +15,12 @@ export function renderHeatmap(container, tiles, timeframe) {
     return;
   }
 
+  // Normalize market caps into weights
   const totalCap = valid
     .map((t) => t.marketCap)
     .reduce((a, b) => a + b, 0);
+
+  if (!totalCap) return;
 
   const nodes = valid.map((t) => ({
     tile: t,
@@ -53,8 +56,15 @@ export function renderHeatmap(container, tiles, timeframe) {
     const pctDisplay =
       pct != null && !Number.isNaN(pct) ? `${pct.toFixed(2)}%` : '--';
 
+    const logoHtml = tile.logoUrl
+      ? `<img class="tile-logo" src="${tile.logoUrl}" alt="${tile.symbol} logo" />`
+      : '';
+
     el.innerHTML = `
-      <div class="tile-symbol">${tile.symbol}</div>
+      <div class="tile-header">
+        ${logoHtml}
+        <div class="tile-symbol">${tile.symbol}</div>
+      </div>
       ${tile.label ? `<div class="tile-label">${tile.label}</div>` : ''}
       <div class="tile-pct">${pctDisplay}</div>
     `;
@@ -65,6 +75,7 @@ export function renderHeatmap(container, tiles, timeframe) {
 
 function pctColorClass(pct) {
   if (pct == null || Number.isNaN(pct)) return 'pct-neutral';
+
   if (pct > 3) return 'pct-strong-pos';
   if (pct > 0.5) return 'pct-pos';
   if (pct < -3) return 'pct-strong-neg';
@@ -88,64 +99,49 @@ function computeTreemap(nodes, x, y, w, h, orientation) {
   if (!nodes.length || totalWeight <= 0) return [];
 
   if (nodes.length === 1) {
-    return [
-      {
-        tile: nodes[0].tile,
-        x,
-        y,
-        w,
-        h,
-      },
-    ];
+    return [{ tile: nodes[0].tile, x, y, w, h }];
   }
 
-  // Sort descending by weight
+  // Sort by weight descending
   const sorted = [...nodes].sort((a, b) => b.weight - a.weight);
 
-  // Partition into two groups with roughly equal total weight
+  // Split into two groups to balance total weights
   const groupA = [];
   const groupB = [];
   let sumA = 0;
-  const half = totalWeight / 2;
+  let sumB = 0;
 
-  for (const node of sorted) {
-    if (sumA < half) {
-      groupA.push(node);
-      sumA += node.weight;
+  for (const n of sorted) {
+    if (sumA <= sumB) {
+      groupA.push(n);
+      sumA += n.weight;
     } else {
-      groupB.push(node);
+      groupB.push(n);
+      sumB += n.weight;
     }
   }
 
-  const weightA = groupA
-    .map((n) => n.weight)
-    .reduce((s, v) => s + v, 0);
-  const weightB = totalWeight - weightA;
-
-  let rects = [];
+  const rects = [];
+  const weightA = sumA;
+  const weightB = sumB;
+  const total = weightA + weightB || 1;
 
   if (orientation === 'vertical') {
-    const wA = (weightA / totalWeight) * w;
+    const wA = (weightA / total) * w;
     const wB = w - wA;
 
-    rects = rects
-      .concat(
-        computeTreemap(groupA, x, y, wA, h, 'horizontal'),
-      )
-      .concat(
-        computeTreemap(groupB, x + wA, y, wB, h, 'horizontal'),
-      );
+    rects.push(
+      ...computeTreemap(groupA, x, y, wA, h, 'horizontal'),
+      ...computeTreemap(groupB, x + wA, y, wB, h, 'horizontal'),
+    );
   } else {
-    const hA = (weightA / totalWeight) * h;
+    const hA = (weightA / total) * h;
     const hB = h - hA;
 
-    rects = rects
-      .concat(
-        computeTreemap(groupA, x, y, w, hA, 'vertical'),
-      )
-      .concat(
-        computeTreemap(groupB, x, y + hA, w, hB, 'vertical'),
-      );
+    rects.push(
+      ...computeTreemap(groupA, x, y, w, hA, 'vertical'),
+      ...computeTreemap(groupB, x, y + hA, w, hB, 'vertical'),
+    );
   }
 
   return rects;
