@@ -40,16 +40,6 @@ export const SP500_CONSTITUENTS = [
   { symbol: 'PM', name: 'Philip Morris International' },
   { symbol: 'TMUS', name: 'T-Mobile US' },
   { symbol: 'GS', name: 'Goldman Sachs' },
-  { symbol: 'RTX', name: 'RTX Corporation' },
-  { symbol: 'CRM', name: 'Salesforce' },
-  { symbol: 'MRK', name: 'Merck & Co.' },
-  { symbol: 'ABT', name: 'Abbott Laboratories' },
-  { symbol: 'MCD', name: 'McDonald\'s' },
-  { symbol: 'TMO', name: 'Thermo Fisher Scientific' },
-  { symbol: 'PEP', name: 'PepsiCo' },
-  { symbol: 'LIN', name: 'Linde plc' },
-  { symbol: 'ISRG', name: 'Intuitive Surgical' },
-  { symbol: 'UBER', name: 'Uber' },
   // ...add more as needed
 ];
 
