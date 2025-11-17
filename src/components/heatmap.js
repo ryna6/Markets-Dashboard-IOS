@@ -54,11 +54,11 @@ export function renderHeatmap(container, tiles, timeframe) {
     el.style.height = `${h * 100}%`;
 
     const area = w * h; // normalized area (0–1)
-    let scale = 0.8 + Math.sqrt(area) * 1.6; // base + grow with size
+    let scale = 1 + Math.sqrt(area) * 2; // base + grow with size
     
     // Clamp so it never gets too tiny or huge
-    if (scale < 0.7) scale = 0.7;
-    if (scale > 3) scale = 3;
+    if (scale < 0.8) scale = 0.8;
+    if (scale > 4) scale = 4;
     
     // Expose to CSS as a custom property
     el.style.setProperty('--tile-scale', scale.toString());
@@ -72,7 +72,7 @@ export function renderHeatmap(container, tiles, timeframe) {
 
   // Decide whether to show text based on tile scale
   // If scale < 0.7 → only logo; otherwise logo + symbol + %
-  const showText = scale >= 0.7;
+  const showText = scale >= 0.8;
 
   const symbolHtml = showText
     ? `<div class="tile-symbol">${tile.symbol}</div>`
