@@ -137,6 +137,13 @@ async function refreshMarketCapsIfNeeded() {
     }
   }
 
+  if (profile && typeof profile.marketCap ==='number') {
+    marketCaps[symbol] = profile.marketCap;
+  }
+  const logo = profile.logo || null;
+  if (!sp500State.logos) sp500State.logos = {};
+  sp500State.logos[symbol] = logo;
+  
   sp500State.marketCaps = marketCaps;
   sp500State.lastMarketCapFetch = nowEstIso;
   saveCache();
@@ -159,6 +166,7 @@ export async function getSp500Data() {
     symbols: sp500State.symbols,
     quotes: sp500State.quotes,
     marketCaps: sp500State.marketCaps,
+    logos: sp500State.logos,
     lastQuotesFetch: sp500State.lastQuotesFetch,
     status: sp500State.status,
     error: sp500State.error,
