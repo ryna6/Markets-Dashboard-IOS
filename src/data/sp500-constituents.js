@@ -1,9 +1,4 @@
 // src/data/sp500-constituents.js
-
-// NOTE: This is a partial sample list, not the full 500.
-// You can expand this list or regenerate from FMP's /sp500_constituent
-// endpoint and paste it here if you want offline/fallback behavior.
-
 export const SP500_CONSTITUENTS = [
   { symbol: 'NVDA', name: 'Nvidia' },
   { symbol: 'AAPL', name: 'Apple Inc.' },
