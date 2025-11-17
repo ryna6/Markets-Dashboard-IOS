@@ -43,8 +43,7 @@ export async function getCompanyProfile(symbol) {
     `/stock/profile2?symbol=${encodeURIComponent(key)}`
   );
 
-  // Finnhub docs: marketCapitalization is a number. Units can be billions;
-  // for our relative comparisons, only ordering matters.
+  // Finnhub field: marketCapitalization (number; units may be billions)
   const rawCap =
     typeof data.marketCapitalization === 'number'
       ? data.marketCapitalization
