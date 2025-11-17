@@ -5,7 +5,7 @@ import { toEstIso, getCurrentWeekRangeEst, isOlderThanMinutes, } from './timezon
 import { getCompanyProfile } from './companyService.js';
 
 // Mid+large cap threshold (roughly $2B)
-const MIN_MARKET_CAP = 2_000_000_000;
+const MIN_MARKET_CAP = 200_000_000_000;
 const EARNINGS_REFRESH_MINUTES = 60 * 24; // refresh at most once per day per week
 
 let earningsState = {
