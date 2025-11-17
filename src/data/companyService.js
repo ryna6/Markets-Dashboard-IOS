@@ -1,76 +1,71 @@
 // src/data/companyService.js
 import { apiClient } from './apiClient.js';
 import { STORAGE_KEYS } from './constants.js';
-import { toEstIso, isOlderThanMinutes } from './timezone.js';
 
-const PROFILE_REFRESH_MINUTES = 60 * 24 * 3; // ~3 days
+const PROFILE_TTL_MINUTES = 60 * 24 * 7; // 1 week in cache
 
-let profileState = {
-  profiles: {},      // symbol -> { name, marketCap, logo }
-  fetchedAt: {}      // symbol -> ISO datetime
-};
+let profileCache = {}; // symbol -> { name, logo, marketCap, lastFetchIso }
 
 function loadCache() {
   const raw = localStorage.getItem(STORAGE_KEYS.companyProfilesCache);
   if (!raw) return;
   try {
     const parsed = JSON.parse(raw);
-    profileState = { ...profileState, ...parsed };
+    profileCache = parsed || {};
   } catch (_) {}
 }
 
 function saveCache() {
-  const snapshot = {
-    profiles: profileState.profiles,
-    fetchedAt: profileState.fetchedAt
-  };
-  localStorage.setItem(STORAGE_KEYS.companyProfilesCache, JSON.stringify(snapshot));
+  localStorage.setItem(
+    STORAGE_KEYS.companyProfilesCache,
+    JSON.stringify(profileCache)
+  );
 }
 
 loadCache();
 
-/**
- * Fetch company profile (name, marketCap, logo) from Finnhub stock/profile2
- * https://finnhub.io/docs/api/company-profile2 
- */
-export async function getCompanyProfile(symbol) {
-  const cached = profileState.profiles[symbol];
-  const last = profileState.fetchedAt[symbol];
+function isStale(lastFetchIso) {
+  if (!lastFetchIso) return true;
+  const last = new Date(lastFetchIso);
+  const now = new Date();
+  const diffMs = now - last;
+  return diffMs > PROFILE_TTL_MINUTES * 60 * 1000;
+}
 
-  if (
-    cached &&
-    last &&
-    !isOlderThanMinutes(last, PROFILE_REFRESH_MINUTES, 'America/New_York')
-  ) {
+export async function getCompanyProfile(symbol) {
+  const key = symbol.toUpperCase();
+  const cached = profileCache[key];
+  if (cached && !isStale(cached.lastFetchIso)) {
     return cached;
   }
 
-  let data;
-  try {
-    data = await apiClient.finnhub(
-      `/stock/profile2?symbol=${encodeURIComponent(symbol)}`
-    );
-  } catch (err) {
-    // On error, return whatever cache we had, or a basic object
-    return cached || { name: symbol, marketCap: null, logo: null };
-  }
+  const data = await apiClient.finnhub(
+    `/stock/profile2?symbol=${encodeURIComponent(key)}`
+  );
 
-  const marketCap = data.marketCapitalization ?? null;
-  let logo = data.logo || null;
-  if (logo && !logo.startsWith('http')) {
-    // Finnhub sometimes returns "static.finnhub.io/..." 
-    logo = `https://${logo}`;
+  // Finnhub: marketCapitalization is usually in billions of USD, but
+  // for our purposes (relative size), the exact units don't matter.
+  const rawCap = typeof data.marketCapitalization === 'number'
+    ? data.marketCapitalization
+    : null;
+
+  // Normalize logo URL: Finnhub sometimes returns "static.finnhub.io/..."
+  let logoUrl = null;
+  if (data.logo) {
+    logoUrl = data.logo.startsWith('http')
+      ? data.logo
+      : `https://${data.logo}`;
   }
 
   const profile = {
-    name: data.name || symbol,
-    marketCap,
-    logo
+    symbol: key,
+    name: data.name || data.ticker || key,
+    logo: logoUrl,
+    marketCap: rawCap,
+    lastFetchIso: new Date().toISOString(),
   };
 
-  profileState.profiles[symbol] = profile;
-  profileState.fetchedAt[symbol] = toEstIso(new Date());
+  profileCache[key] = profile;
   saveCache();
-
   return profile;
 }
