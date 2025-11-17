@@ -1,9 +1,8 @@
-/* The outer box that the treemap fills */
+/* Container for the entire heatmap */
 .heatmap-container {
   position: relative;
   width: 100%;
-  /* Adjust height to taste; this will fill most of the screen below toolbar */
-  height: calc(100vh - 140px);
+  height: calc(100vh - 140px); /* adjust to taste */
   background-color: #050505;
   overflow: hidden;
 }
@@ -18,6 +17,9 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text',
     'Helvetica Neue', Arial, sans-serif;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Color classes */
@@ -41,35 +43,42 @@
   background-color: #b32020;
 }
 
-/* Header row: logo + symbol */
-.tile-header {
+/* Centered column content inside each tile */
+.tile-content {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
-  margin-bottom: 2px;
+  text-align: center;
+  width: 100%;
+  height: 100%;
+  gap: 2px;
 }
 
+/* Logo at the top */
 .tile-logo {
-  max-height: 14px;
+  max-height: 16px;
   max-width: 40px;
   object-fit: contain;
   display: block;
 }
 
-/* Inner text layout */
+/* Ticker in the middle */
 .tile-symbol {
   font-weight: 600;
   font-size: 11px;
 }
 
-.tile-label {
-  font-size: 9px;
-  opacity: 0.8;
-}
-
+/* % change at the bottom */
 .tile-pct {
   font-size: 11px;
   font-weight: 600;
-  text-align: right;
+}
+
+/* Optional: if a tile gets very small, shrink text a bit */
+@media (max-width: 600px) {
+  .tile-symbol,
+  .tile-pct {
+    font-size: 10px;
+  }
 }
