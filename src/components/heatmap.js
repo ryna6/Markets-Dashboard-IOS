@@ -12,7 +12,6 @@ export function renderHeatmap(container, tiles, timeframe) {
   );
 
   if (!valid.length) {
-    // Fallback: no market caps, nothing to draw
     return;
   }
 
@@ -20,7 +19,6 @@ export function renderHeatmap(container, tiles, timeframe) {
     .map((t) => t.marketCap)
     .reduce((a, b) => a + b, 0);
 
-  // Build nodes with weight = marketCap
   const nodes = valid.map((t) => ({
     tile: t,
     weight: t.marketCap,
@@ -30,8 +28,19 @@ export function renderHeatmap(container, tiles, timeframe) {
 
   rects.forEach(({ tile, x, y, w, h }) => {
     const el = document.createElement('div');
-    const pct =
+
+    // Prefer timeframe-specific pct, but fall back to whichever exists
+    const primary =
       timeframe === '1D' ? tile.changePct1D : tile.changePct1W;
+    const fallback =
+      timeframe === '1D' ? tile.changePct1W : tile.changePct1D;
+
+    const pct =
+      primary != null && !Number.isNaN(primary)
+        ? primary
+        : fallback != null && !Number.isNaN(fallback)
+        ? fallback
+        : null;
 
     const colorClass = pctColorClass(pct);
 
