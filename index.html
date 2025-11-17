@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Markets Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Styles -->
+    <link rel="stylesheet" href="./src/styles/base.css" />
+    <link rel="stylesheet" href="./src/styles/layout.css" />
+    <link rel="stylesheet" href="./src/styles/heatmap.css" />
+    <link rel="stylesheet" href="./src/styles/calendar.css" />
+    <link rel="stylesheet" href="./src/styles/tabs.css" />
+  </head>
+  <body class="theme-dark">
+    <div id="app">
+      <header class="app-header">
+        <h1>Markets Dashboard</h1>
+      </header>
+
+      <main id="view-container">
+        <!-- S&P 500 -->
+        <section id="sp500-view" class="tab-view">
+          <div class="toolbar">
+            <div class="toolbar-title">S&amp;P 500 Heatmap</div>
+            <select class="timeframe-select">
+              <option value="1D">1D</option>
+              <option value="1W">1W</option>
+            </select>
+          </div>
+          <div class="last-updated"></div>
+          <div class="heatmap-container"></div>
+        </section>
+
+        <!-- Sectors -->
+        <section id="sectors-view" class="tab-view">
+          <div class="toolbar">
+            <div class="toolbar-title">Sector Heatmap</div>
+            <select class="timeframe-select">
+              <option value="1D">1D</option>
+              <option value="1W">1W</option>
+            </select>
+          </div>
+          <div class="last-updated"></div>
+          <div class="heatmap-container"></div>
+        </section>
+
+        <!-- Crypto -->
+        <section id="crypto-view" class="tab-view">
+          <div class="toolbar">
+            <div class="toolbar-title">Crypto Heatmap</div>
+            <select class="timeframe-select">
+              <option value="1D">1D</option>
+              <option value="1W">1W</option>
+            </select>
+          </div>
+          <div class="last-updated"></div>
+          <div class="heatmap-container"></div>
+        </section>
+
+        <!-- Earnings -->
+        <section id="earnings-view" class="tab-view">
+          <div class="toolbar">
+            <div class="toolbar-title">Earnings Calendar</div>
+            <button class="earnings-refresh-btn">Refresh</button>
+          </div>
+          <div class="last-updated"></div>
+          <div id="earnings-calendar" class="earnings-grid"></div>
+        </section>
+      </main>
+
+      <nav id="tab-bar" class="tab-bar">
+        <button class="tab" data-tab="sp500">S&amp;P 500</button>
+        <button class="tab" data-tab="sectors">Sectors</button>
+        <button class="tab" data-tab="crypto">Crypto</button>
+        <button class="tab" data-tab="earnings">Earnings</button>
+      </nav>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
