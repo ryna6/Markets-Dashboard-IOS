@@ -1,4 +1,4 @@
-// components/heatmap.js
+// src/components/heatmap.js
 
 // tiles: [{ symbol, label?, marketCap?, changePct1D, changePct1W }]
 export function renderHeatmap(container, tiles, timeframe) {
@@ -6,20 +6,40 @@ export function renderHeatmap(container, tiles, timeframe) {
 
   container.innerHTML = '';
 
-  const grid = document.createElement('div');
-  grid.className = 'heatmap-grid';
+  // Filter out anything without a positive market cap
+  const valid = tiles.filter(
+    (t) => typeof t.marketCap === 'number' && t.marketCap > 0
+  );
 
-  const getSizeClass = createSizeClassLookup(tiles);
+  if (!valid.length) {
+    // Fallback: no market caps, nothing to draw
+    return;
+  }
 
-  tiles.forEach(tile => {
+  const totalCap = valid
+    .map((t) => t.marketCap)
+    .reduce((a, b) => a + b, 0);
+
+  // Build nodes with weight = marketCap
+  const nodes = valid.map((t) => ({
+    tile: t,
+    weight: t.marketCap,
+  }));
+
+  const rects = computeTreemap(nodes, 0, 0, 1, 1, 'vertical');
+
+  rects.forEach(({ tile, x, y, w, h }) => {
     const el = document.createElement('div');
     const pct =
       timeframe === '1D' ? tile.changePct1D : tile.changePct1W;
 
     const colorClass = pctColorClass(pct);
-    const sizeClass = getSizeClass(tile.symbol);
 
-    el.className = `heatmap-tile ${colorClass} ${sizeClass}`;
+    el.className = `heatmap-tile ${colorClass}`;
+    el.style.left = `${x * 100}%`;
+    el.style.top = `${y * 100}%`;
+    el.style.width = `${w * 100}%`;
+    el.style.height = `${h * 100}%`;
 
     const pctDisplay =
       pct != null && !Number.isNaN(pct) ? `${pct.toFixed(2)}%` : '--';
@@ -30,10 +50,8 @@ export function renderHeatmap(container, tiles, timeframe) {
       <div class="tile-pct">${pctDisplay}</div>
     `;
 
-    grid.appendChild(el);
+    container.appendChild(el);
   });
-
-  container.appendChild(grid);
 }
 
 function pctColorClass(pct) {
@@ -45,28 +63,81 @@ function pctColorClass(pct) {
   return 'pct-neutral';
 }
 
-// Build a lookup for size class based on market cap share
-function createSizeClassLookup(tiles) {
-  const caps = tiles
-    .map(t => t.marketCap)
-    .filter(c => typeof c === 'number' && c > 0);
+/**
+ * Simple binary slice treemap:
+ * - nodes: [{ tile, weight }]
+ * - x, y, w, h: numbers in [0,1] representing the rectangle
+ * - orientation: 'vertical' or 'horizontal'
+ *
+ * Returns: [{ tile, x, y, w, h }]
+ */
+function computeTreemap(nodes, x, y, w, h, orientation) {
+  const totalWeight = nodes
+    .map((n) => n.weight)
+    .reduce((a, b) => a + b, 0);
 
-  if (!caps.length) {
-    // no market caps – fall back to small tiles
-    return () => 'size-small';
+  if (!nodes.length || totalWeight <= 0) return [];
+
+  if (nodes.length === 1) {
+    return [
+      {
+        tile: nodes[0].tile,
+        x,
+        y,
+        w,
+        h,
+      },
+    ];
   }
 
-  const totalCap = caps.reduce((a, b) => a + b, 0);
+  // Sort descending by weight
+  const sorted = [...nodes].sort((a, b) => b.weight - a.weight);
 
-  return symbol => {
-    const tile = tiles.find(t => t.symbol === symbol);
-    if (!tile || !tile.marketCap || !totalCap) return 'size-small';
+  // Partition into two groups with roughly equal total weight
+  const groupA = [];
+  const groupB = [];
+  let sumA = 0;
+  const half = totalWeight / 2;
 
-    const share = tile.marketCap / totalCap;
+  for (const node of sorted) {
+    if (sumA < half) {
+      groupA.push(node);
+      sumA += node.weight;
+    } else {
+      groupB.push(node);
+    }
+  }
 
-    // tweak thresholds to taste
-    if (share >= 0.04) return 'size-large';      // biggest names
-    if (share >= 0.015) return 'size-medium';    // mid group
-    return 'size-small';
-  };
+  const weightA = groupA
+    .map((n) => n.weight)
+    .reduce((s, v) => s + v, 0);
+  const weightB = totalWeight - weightA;
+
+  let rects = [];
+
+  if (orientation === 'vertical') {
+    const wA = (weightA / totalWeight) * w;
+    const wB = w - wA;
+
+    rects = rects
+      .concat(
+        computeTreemap(groupA, x, y, wA, h, 'horizontal'),
+      )
+      .concat(
+        computeTreemap(groupB, x + wA, y, wB, h, 'horizontal'),
+      );
+  } else {
+    const hA = (weightA / totalWeight) * h;
+    const hB = h - hA;
+
+    rects = rects
+      .concat(
+        computeTreemap(groupA, x, y, w, hA, 'vertical'),
+      )
+      .concat(
+        computeTreemap(groupB, x, y + hA, w, hB, 'vertical'),
+      );
+  }
+
+  return rects;
 }
