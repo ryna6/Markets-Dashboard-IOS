@@ -89,3 +89,18 @@ export async function getCryptoData() {
   } catch (_) {}
   return cryptoState;
 }
+
+export function resetCryptoCache() {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.cryptoCache);
+  } catch (_) {
+    // ignore storage errors
+  }
+
+  cryptoState = {
+    items: [],
+    lastFetch: null,
+    status: 'idle',
+    error: null,
+  };
+}
