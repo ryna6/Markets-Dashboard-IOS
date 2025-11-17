@@ -3,9 +3,8 @@ import { apiClient } from './apiClient.js';
 import { STORAGE_KEYS } from './constants.js';
 import { toEstIso, isOlderThanMinutes } from './timezone.js';
 
-// Refresh cadences
 const SECTOR_REFRESH_MINUTES = 10;
-const SECTOR_WEEKLY_REFRESH_MINUTES = 60 * 12;
+const SECTOR_WEEKLY_RECALC_MINUTES = 60;
 
 // SPDR sector ETFs
 const SECTOR_LIST = [
@@ -22,27 +21,28 @@ const SECTOR_LIST = [
   { symbol: 'XLP', name: 'Consumer Staples' },
 ];
 
-// Static S&P 500 sector weights (approx)
+// Static weights for treemap sizing
 const SECTOR_WEIGHTS = {
-  XLK: 34.0,  // Information Technology
-  XLF: 13.8,  // Financials
-  XLY: 10.4,  // Consumer Discretionary
-  XLC: 9.9,   // Communication Services
-  XLV: 8.8,   // Health Care
-  XLI: 8.6,   // Industrials
-  XLP: 5.2,   // Consumer Staples
-  XLE: 3.0,   // Energy
-  XLU: 2.5,   // Utilities
-  XLRE: 2.0,  // Real Estate
-  XLB: 1.9,   // Materials (approx)
+  XLK: 34.0,
+  XLF: 13.8,
+  XLY: 10.4,
+  XLC: 9.9,
+  XLV: 8.8,
+  XLI: 8.6,
+  XLP: 5.2,
+  XLE: 3.0,
+  XLU: 2.5,
+  XLRE: 2.0,
+  XLB: 1.9,
 };
 
 let sectorState = {
   sectors: SECTOR_LIST,
   quotes: {},          // symbol -> { price, changePct1D }
   weeklyChange: {},    // symbol -> { changePct1W }
+  priceHistory: {},    // symbol -> [{ date, close }]
   lastQuotesFetch: null,
-  lastWeeklyFetch: null,
+  lastWeeklyCalc: null,
   status: 'idle',
   error: null,
 };
@@ -55,8 +55,21 @@ function loadCache() {
     sectorState.quotes = parsed.quotes || sectorState.quotes;
     sectorState.weeklyChange = parsed.weeklyChange || sectorState.weeklyChange;
     sectorState.lastQuotesFetch = parsed.lastQuotesFetch || null;
-    sectorState.lastWeeklyFetch = parsed.lastWeeklyFetch || null;
-  } catch (_) {}
+  } catch (_) {
+    // ignore
+  }
+}
+
+function loadHistory() {
+  const raw = localStorage.getItem(STORAGE_KEYS.sectorHistory);
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    sectorState.priceHistory = parsed.priceHistory || {};
+    sectorState.lastWeeklyCalc = parsed.lastWeeklyCalc || null;
+  } catch (_) {
+    // ignore
+  }
 }
 
 function saveCache() {
@@ -64,15 +77,78 @@ function saveCache() {
     quotes: sectorState.quotes,
     weeklyChange: sectorState.weeklyChange,
     lastQuotesFetch: sectorState.lastQuotesFetch,
-    lastWeeklyFetch: sectorState.lastWeeklyFetch,
   };
   localStorage.setItem(STORAGE_KEYS.sectorCache, JSON.stringify(snapshot));
 }
 
+function saveHistory() {
+  const snapshot = {
+    priceHistory: sectorState.priceHistory,
+    lastWeeklyCalc: sectorState.lastWeeklyCalc,
+  };
+  localStorage.setItem(STORAGE_KEYS.sectorHistory, JSON.stringify(snapshot));
+}
+
 loadCache();
+loadHistory();
 
 function getSectorSymbols() {
   return sectorState.sectors.map((s) => s.symbol);
+}
+
+function getTodayEstDate() {
+  const estIso = toEstIso(new Date());
+  return estIso.slice(0, 10);
+}
+
+function isWeekendDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
+function updateHistoryFromQuotes(quotes) {
+  const today = getTodayEstDate();
+  if (isWeekendDate(today)) {
+    // Don't store weekend samples
+    return;
+  }
+
+  const history = sectorState.priceHistory || {};
+
+  Object.entries(quotes).forEach(([symbol, q]) => {
+    const close =
+      q && typeof q.price === 'number'
+        ? q.price
+        : null;
+    if (close == null) return;
+
+    const sym = symbol.toUpperCase();
+    const arr = Array.isArray(history[sym]) ? history[sym] : [];
+    const last = arr[arr.length - 1];
+
+    if (last && last.date === today) {
+      last.close = close;
+    } else {
+      arr.push({ date: today, close });
+    }
+
+    // Drop entries older than 14 days
+    const cutoff = new Date(today + 'T00:00:00');
+    cutoff.setDate(cutoff.getDate() - 14);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+    const filtered = arr.filter((entry) => entry.date >= cutoffStr);
+
+    // Hard cap
+    while (filtered.length > 10) {
+      filtered.shift();
+    }
+
+    history[sym] = filtered;
+  });
+
+  sectorState.priceHistory = history;
 }
 
 async function refreshSectorQuotesIfNeeded() {
@@ -123,56 +199,53 @@ async function refreshSectorQuotesIfNeeded() {
   sectorState.quotes = quotes;
   sectorState.lastQuotesFetch = nowEstIso;
   sectorState.status = 'ready';
+
+  updateHistoryFromQuotes(quotes);
   saveCache();
+  saveHistory();
 }
 
 async function refreshSectorWeeklyIfNeeded() {
   const nowEstIso = toEstIso(new Date());
 
   if (
-    sectorState.lastWeeklyFetch &&
+    sectorState.lastWeeklyCalc &&
     !isOlderThanMinutes(
-      sectorState.lastWeeklyFetch,
-      SECTOR_WEEKLY_REFRESH_MINUTES,
+      sectorState.lastWeeklyCalc,
+      SECTOR_WEEKLY_RECALC_MINUTES,
       'America/New_York'
     )
   ) {
     return;
   }
 
-  const symbols = getSectorSymbols();
-  const weeklyChange = { ...sectorState.weeklyChange };
+  const history = sectorState.priceHistory || {};
+  const weeklyChange = {};
 
-  const nowSec = Math.floor(Date.now() / 1000);
-  const weekAgoSec = nowSec - 7 * 24 * 60 * 60;
+  Object.entries(history).forEach(([symbol, arr]) => {
+    if (!Array.isArray(arr) || arr.length < 2) return;
 
-  for (const symbol of symbols) {
-    try {
-      const data = await apiClient.finnhub(
-        `/stock/candle?symbol=${encodeURIComponent(
-          symbol
-        )}&resolution=D&from=${weekAgoSec}&to=${nowSec}`
-      );
-      if (data.s !== 'ok' || !Array.isArray(data.c) || data.c.length < 2) {
-        continue;
-      }
+    const latest = arr[arr.length - 1];
+    const lookbackIndex = Math.max(0, arr.length - 5);
+    const older = arr[lookbackIndex];
 
-      const closes = data.c;
-      const latest = closes[closes.length - 1];
-      const weekAgo = closes[0];
-
-      if (!weekAgo || weekAgo === 0) continue;
-
-      const pct = ((latest - weekAgo) / weekAgo) * 100;
-      weeklyChange[symbol] = { changePct1W: pct };
-    } catch (err) {
-      console.warn('Sector weekly candle error', symbol, err);
+    if (
+      !older ||
+      typeof older.close !== 'number' ||
+      typeof latest.close !== 'number' ||
+      older.close === 0
+    ) {
+      return;
     }
-  }
+
+    const pct = ((latest.close - older.close) / older.close) * 100;
+    weeklyChange[symbol] = { changePct1W: pct };
+  });
 
   sectorState.weeklyChange = weeklyChange;
-  sectorState.lastWeeklyFetch = nowEstIso;
+  sectorState.lastWeeklyCalc = nowEstIso;
   saveCache();
+  saveHistory();
 }
 
 export async function getSectorData(timeframe) {
@@ -194,7 +267,6 @@ export async function getSectorData(timeframe) {
     sectors: sectorState.sectors,
     quotes: sectorState.quotes,
     weeklyChange: sectorState.weeklyChange,
-    // fixed "marketCap" weights for treemap sizing
     marketCaps: SECTOR_WEIGHTS,
     lastQuotesFetch: sectorState.lastQuotesFetch,
     status: sectorState.status,
@@ -203,18 +275,23 @@ export async function getSectorData(timeframe) {
 }
 
 export function resetSectorCache() {
+  // Clear only the cache, preserve history
   try {
     localStorage.removeItem(STORAGE_KEYS.sectorCache);
   } catch (_) {
-    // ignore storage errors
+    // ignore
   }
+
+  const preservedHistory = sectorState.priceHistory || {};
+  const preservedLastWeeklyCalc = sectorState.lastWeeklyCalc || null;
 
   sectorState = {
     sectors: SECTOR_LIST,
     quotes: {},
     weeklyChange: {},
+    priceHistory: preservedHistory,    // keep history
     lastQuotesFetch: null,
-    lastWeeklyFetch: null,
+    lastWeeklyCalc: preservedLastWeeklyCalc,
     status: 'idle',
     error: null,
   };
