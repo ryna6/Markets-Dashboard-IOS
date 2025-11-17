@@ -3,10 +3,16 @@ import { apiClient } from './apiClient.js';
 import { STORAGE_KEYS } from './constants.js';
 import { toEstIso, getCurrentWeekRangeEst, isOlderThanMinutes, } from './timezone.js';
 import { getCompanyProfile } from './companyService.js';
+import { IMPORTANT_TICKERS } from './importantTickers.js';
 
-// How many earnings to show per week (biggest by market cap)
-const MAX_EARNINGS_COUNT = 20;
-const EARNINGS_REFRESH_MINUTES = 60 * 24; // refresh at most once per day per week
+// Market cap threshold: only show companies above this.
+// You can adjust based on Finnhub's units; start with ~10 or 20 if they are billions.
+const MIN_MARKET_CAP = 5; // e.g. 10 (if Finnhub uses billions), tweak after you inspect values
+
+// Also cap the total number of earnings shown in a week as a secondary safety.
+const MAX_EARNINGS_COUNT = 40;
+
+const EARNINGS_REFRESH_MINUTES = 60 * 24; // at most once/day per week
 
 let earningsState = {
   weekKey: null,     // e.g. '2025-47'
@@ -83,6 +89,26 @@ function sessionFromHour(hour) {
   return 'AMC';
 }
 
+// Optionally, a simple no-throttle profile fetch.
+// If you want throttling, we can enhance this later.
+async function fetchProfilesForSymbols(symbolSet) {
+  const profiles = {};
+  for (const symbol of symbolSet) {
+    try {
+      const p = await getCompanyProfile(symbol);
+      profiles[symbol] = p;
+    } catch (_) {
+      profiles[symbol] = {
+        symbol,
+        name: symbol,
+        logo: null,
+        marketCap: null,
+      };
+    }
+  }
+  return profiles;
+}
+
 async function refreshEarningsIfNeeded() {
   const { monday, friday } = getCurrentWeekRangeEst();
   const fromIso = monday.toISOString().slice(0, 10);
@@ -117,8 +143,18 @@ async function refreshEarningsIfNeeded() {
     throw err;
   }
 
-  const entries = raw.earningsCalendar || [];
-  if (!entries.length) {
+  const allEntries = raw.earningsCalendar || [];
+
+  // STEP 1: filter entries by your important ticker universe
+  const importantSet = new Set(
+    IMPORTANT_TICKERS.map((t) => t.toUpperCase())
+  );
+
+  const filteredEntries = allEntries.filter((e) =>
+    importantSet.has((e.symbol || '').toUpperCase())
+  );
+
+  if (!filteredEntries.length) {
     earningsState.weekKey = weekKey;
     earningsState.dataByDay = emptyWeekStruct();
     earningsState.lastFetch = nowIso;
@@ -127,57 +163,45 @@ async function refreshEarningsIfNeeded() {
     return;
   }
 
-  // Fetch profiles / market caps once per symbol
-  const symbolSet = new Set(entries.map((e) => e.symbol).filter(Boolean));
-  const profiles = {};
+  // STEP 2: fetch profiles for these filtered symbols to get marketCap/logo
+  const symbolSet = new Set(
+    filteredEntries.map((e) => (e.symbol || '').toUpperCase())
+  );
+  const profiles = await fetchProfilesForSymbols(symbolSet);
 
-  for (const symbol of symbolSet) {
-    try {
-      profiles[symbol] = await getCompanyProfile(symbol);
-    } catch (_) {
-      profiles[symbol] = {
-        symbol,
-        name: symbol,
-        logo: null,
-        marketCap: null,
-      };
-    }
-  }
-
-  // Decorate entries with marketCap, then sort + pick top N
-  const decorated = entries.map((e) => {
-    const profile = profiles[e.symbol] || {
-      symbol: e.symbol,
-      name: e.symbol,
+  // STEP 3: further filter by market cap (if we have it)
+  const decorated = filteredEntries.map((e) => {
+    const key = (e.symbol || '').toUpperCase();
+    const profile = profiles[key] || {
+      symbol: key,
+      name: key,
       logo: null,
       marketCap: null,
     };
     return { entry: e, profile };
   });
 
-  // Filter out unknown caps first; if we end up with none, fall back to raw entries.
-  let withCap = decorated.filter(
-    (d) =>
-      d.profile.marketCap != null &&
-      typeof d.profile.marketCap === 'number' &&
-      !Number.isNaN(d.profile.marketCap)
-  );
+  let filteredByCap = decorated.filter((d) => {
+    const cap = d.profile.marketCap;
+    if (cap == null || Number.isNaN(cap)) {
+      // If cap unknown, you can decide whether to keep or drop.
+      // Here we keep unknowns so you don't silently miss big names.
+      return true;
+    }
+    return cap >= MIN_MARKET_CAP;
+  });
 
-  if (!withCap.length) {
-    // No usable caps, just show everything as a fallback.
-    withCap = decorated;
-  }
-
-  withCap.sort(
+  // STEP 4: sort by marketCap descending and cap the total count for the week
+  filteredByCap.sort(
     (a, b) =>
       (b.profile.marketCap || 0) - (a.profile.marketCap || 0)
   );
 
-  const top = withCap.slice(0, MAX_EARNINGS_COUNT);
+  const finalList = filteredByCap.slice(0, MAX_EARNINGS_COUNT);
 
   const grouped = emptyWeekStruct();
 
-  for (const { entry: e, profile } of top) {
+  for (const { entry: e, profile } of finalList) {
     const dayName = weekdayNameFromDate(e.date);
     if (!dayName || !grouped[dayName]) continue;
 
