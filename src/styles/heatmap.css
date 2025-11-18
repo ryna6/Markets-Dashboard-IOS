@@ -2,7 +2,7 @@
 .heatmap-container {
   position: relative;
   width: 100%;
-  height: calc(100vh - 140px); /* adjust to taste */
+  height: calc(100vh - 120px); /* adjust to taste */
   background-color: #050505;
   overflow: hidden;
 }
@@ -83,10 +83,4 @@
   .tile-pct {
     font-size: 10px;
   }
-}
-
-/* Keep the bottom of the heatmaps clear of the tab bar */
-.heatmap-container {
-  margin-bottom: 44px;
-  padding-bottom: 30px;
 }
