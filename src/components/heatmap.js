@@ -100,7 +100,7 @@ export function renderHeatmap(container, tiles, timeframe) {
     </div>
   `;
 
-    container.appendChild(el);
+    inner.appendChild(el);
   });
 }
 
