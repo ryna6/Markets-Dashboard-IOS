@@ -83,8 +83,8 @@ export function renderHeatmap(container, tiles, timeframe) {
       : '';
 
     // Decide whether to show text based on tile scale
-    // If scale < 0.7 → only logo; otherwise logo + symbol + %
-    const showText = scale >= 0.7;
+    // If scale < 0.6 → only logo; otherwise logo + symbol + %
+    const showText = scale >= 0.6;
 
     const symbolHtml = showText
       ? `<div class="tile-symbol">${tile.symbol}</div>`
