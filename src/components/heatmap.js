@@ -4,17 +4,7 @@
 export function renderHeatmap(container, tiles, timeframe) {
   if (!container) return;
 
-  // Use an inner element for actual heatmap layout so we can
-  // control its aspect ratio separately from the outer container.
-  let inner = container.querySelector('.heatmap-inner');
-  if (!inner) {
-    inner = document.createElement('div');
-    inner.className = 'heatmap-inner';
-    container.innerHTML = '';
-    container.appendChild(inner);
-  } else {
-    inner.innerHTML = '';
-  }
+  container.innerHTML = '';
 
   // Filter out anything without a positive market cap
   const valid = tiles.filter(
