@@ -10,9 +10,9 @@
 /* Inner container controls the aspect ratio for the treemap tiles */
 .heatmap-inner {
   position: relative;
-  width: 100%;
+  width: 140%;
   /* Make the heatmap area closer to square, but never taller than the outer container */
-  height: min(calc(200vw / 1.2), 100%);
+  height: min(calc(160vw / 1.2), 100%);
   background-color: inherit;
   overflow: hidden;
 }
