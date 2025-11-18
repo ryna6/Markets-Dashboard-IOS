@@ -4,7 +4,7 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   /* Move the horizontal scrollbar up from the very bottom */
-  margin-bottom: 8px;        /* distance above the tabs */
+  margin-bottom: 80px;        /* distance above the tabs */
   padding-bottom: 2px;        /* tiny inner gap so the bar isn’t clipped */
 }
 
