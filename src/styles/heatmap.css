@@ -2,7 +2,7 @@
 .heatmap-container {
   position: relative;
   width: 100%;
-  height: calc(100vh - 120px); /* adjust to taste */
+  height: calc(100vh - 100px); /* adjust to taste */
   background-color: #050505;
   overflow: hidden;
 }
