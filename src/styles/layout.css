@@ -58,20 +58,10 @@
   margin-bottom: 4px;
 }
 
-/* Earnings tab: outer container (no scrolling here) */
+/* Earnings tab: its own scroll and smaller bottom padding */
 #earnings-view {
-  position: relative;
-  overflow: hidden; /* disable vertical scroll on the outer */
-  padding-bottom: 0; /* we'll handle the gap via the inner container */
-}
-
-/* Inner scrolling area for the earnings tab */
-.earnings-inner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: calc(40px + env(safe-area-inset-bottom));
   overflow-y: auto;
+  overflow-x: hidden; /* prevent the whole tab (incl. toolbar) from scrolling horizontally */
   -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
 }
