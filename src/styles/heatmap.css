@@ -88,5 +88,5 @@
 /* Keep the bottom of the heatmaps clear of the tab bar */
 .heatmap-container {
   margin-bottom: 24px;
-  padding-bottom: 10px;
+  padding-bottom: 30px;
 }
