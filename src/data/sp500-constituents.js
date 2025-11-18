@@ -6,7 +6,6 @@ export const SP500_CONSTITUENTS = [
   { symbol: 'AMZN', name: 'Amazon' },
   { symbol: 'GOOGL', name: 'Alphabet Inc. (Class A)' },
   { symbol: 'AVGO', name: 'Broadcom' },
-  { symbol: 'GOOG', name: 'Alphabet Inc. (Class C)' },
   { symbol: 'META', name: 'Meta Platforms' },
   { symbol: 'TSLA', name: 'Tesla, Inc.' },
   { symbol: 'BRK.B', name: 'Berkshire Hathaway' },
@@ -45,6 +44,7 @@ export const SP500_CONSTITUENTS = [
   { symbol: 'CRM', name: 'Salesforce' },
   { symbol: 'MCD', name: 'McDonalds' },
   { symbol: 'TMO', name: 'Thermo Fisher Scientific' },
+  { symbol: 'PEP', name: 'PepsiCo' },
   // Top 45 companies based on market cap
 ];
 
