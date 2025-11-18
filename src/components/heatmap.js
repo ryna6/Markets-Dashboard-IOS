@@ -66,7 +66,7 @@ export function renderHeatmap(container, tiles, timeframe) {
 
     // Use area as a proxy for how much content we can safely show inside
     const area = w * h; // normalized area (0–1)
-    let scale = 0.5 + Math.sqrt(area) * 3;
+    let scale = 0.4 + Math.sqrt(area) * 3;
 
     // Clamp so it never gets too tiny or huge
     if (scale < 0.4) scale = 0.4;
@@ -83,8 +83,8 @@ export function renderHeatmap(container, tiles, timeframe) {
       : '';
 
     // Decide whether to show text based on tile scale
-    // If scale < 0.8 → only logo; otherwise logo + symbol + %
-    const showText = scale >= 0.8;
+    // If scale < 0.7 → only logo; otherwise logo + symbol + %
+    const showText = scale >= 0.7;
 
     const symbolHtml = showText
       ? `<div class="tile-symbol">${tile.symbol}</div>`
