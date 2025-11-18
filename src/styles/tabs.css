@@ -3,7 +3,7 @@
   justify-content: space-around;
 
   /* Fallback padding for browsers without safe-area */
-  padding: 8px 0 20px;
+  padding: 8px 0 10px;
 
   /* On iPhones with a home indicator, add extra safe-area space */
   padding-bottom: calc(10px + env(safe-area-inset-bottom));
