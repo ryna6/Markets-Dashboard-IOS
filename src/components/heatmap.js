@@ -14,20 +14,30 @@ export function renderHeatmap(container, tiles, timeframe) {
   if (!valid.length) {
     return;
   }
-  
+
   // Normalize market caps into weights
   const totalCap = valid
     .map((t) => t.marketCap)
     .reduce((a, b) => a + b, 0);
 
   if (!totalCap) return;
-  
+
   const nodes = valid.map((t) => ({
     tile: t,
     weight: t.marketCap,
   }));
 
-  const rects = computeTreemap(nodes, 0, 0, 1, 1, 'vertical');
+  // Choose an initial orientation based on the container aspect ratio.
+  // On tall screens (like phones in portrait), start with a horizontal split
+  // so we fill top-to-bottom instead of left-to-right, which produces
+  // squarer tiles and avoids super-tall columns.
+  const { clientWidth, clientHeight } = container;
+  let initialOrientation = 'vertical';
+  if (clientHeight > clientWidth) {
+    initialOrientation = 'horizontal';
+  }
+
+  const rects = computeTreemap(nodes, 0, 0, 1, 1, initialOrientation);
 
   rects.forEach(({ tile, x, y, w, h }) => {
     const el = document.createElement('div');
@@ -46,51 +56,51 @@ export function renderHeatmap(container, tiles, timeframe) {
         : null;
 
     const colorClass = pctColorClass(pct);
-
     el.className = `heatmap-tile ${colorClass}`;
+
+    // Map normalized (0–1) rect coordinates into percentages of the container
     el.style.left = `${x * 100}%`;
     el.style.top = `${y * 100}%`;
     el.style.width = `${w * 100}%`;
     el.style.height = `${h * 100}%`;
 
-    // --- rest of your code stays the same ---
+    // Use area as a proxy for how much content we can safely show inside
     const area = w * h; // normalized area (0–1)
     let scale = 0.8 + Math.sqrt(area) * 4;
 
-    
     // Clamp so it never gets too tiny or huge
     if (scale < 0.8) scale = 0.8;
     if (scale > 4) scale = 4;
-    
-    // Expose to CSS as a custom property
+
+    // Expose to CSS as a custom property (used by .tile-content)
     el.style.setProperty('--tile-scale', scale.toString());
 
-      const pctDisplay =
-    pct != null && !Number.isNaN(pct) ? `${pct.toFixed(2)}%` : '--';
+    const pctDisplay =
+      pct != null && !Number.isNaN(pct) ? `${pct.toFixed(2)}%` : '--';
 
-  const logoHtml = tile.logoUrl
-    ? `<img class="tile-logo" src="${tile.logoUrl}" alt="${tile.symbol} logo" />`
-    : '';
+    const logoHtml = tile.logoUrl
+      ? `<img class="tile-logo" src="${tile.logoUrl}" alt="${tile.symbol} logo" />`
+      : '';
 
-  // Decide whether to show text based on tile scale
-  // If scale < 1.5 → only logo; otherwise logo + symbol + %
-  const showText = scale >= 1.5;
+    // Decide whether to show text based on tile scale
+    // If scale < 1.5 → only logo; otherwise logo + symbol + %
+    const showText = scale >= 1.5;
 
-  const symbolHtml = showText
-    ? `<div class="tile-symbol">${tile.symbol}</div>`
-    : '';
+    const symbolHtml = showText
+      ? `<div class="tile-symbol">${tile.symbol}</div>`
+      : '';
 
-  const pctHtml = showText
-    ? `<div class="tile-pct">${pctDisplay}</div>`
-    : '';
+    const pctHtml = showText
+      ? `<div class="tile-pct">${pctDisplay}</div>`
+      : '';
 
-  el.innerHTML = `
-    <div class="tile-content">
-      ${logoHtml}
-      ${symbolHtml}
-      ${pctHtml}
-    </div>
-  `;
+    el.innerHTML = `
+      <div class="tile-content">
+        ${logoHtml}
+        ${symbolHtml}
+        ${pctHtml}
+      </div>
+    `;
 
     container.appendChild(el);
   });
