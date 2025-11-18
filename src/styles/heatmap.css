@@ -2,7 +2,7 @@
 .heatmap-container {
   position: relative;
   width: 100%;
-  height: calc(150vh - 140px); /* fits nicely between header and tabs */
+  height: calc(300vh - 140px); /* fits nicely between header and tabs */
   background-color: #050505;
   overflow: hidden;
 }
@@ -12,7 +12,7 @@
   position: relative;
   width: 100%;
   /* Make the heatmap area closer to square, but never taller than the outer container */
-  height: min(calc(180vw / 1.2), 80%);
+  height: min(calc(100vw / 1.2), 80%);
   background-color: inherit;
   overflow: hidden;
 }
