@@ -6,7 +6,7 @@
   padding: 8px 0 20px;
 
   /* On iPhones with a home indicator, add extra safe-area space */
-  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
 
   border-top: 1px solid #222;
   background: #000;
