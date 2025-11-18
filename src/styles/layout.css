@@ -39,5 +39,5 @@
 #earnings-view {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
 }
