@@ -4,8 +4,8 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   /* Move the horizontal scrollbar up from the very bottom */
-  margin-bottom: 12px;        /* distance above the tabs */
-  padding-bottom: 4px;        /* tiny inner gap so the bar isn’t clipped */
+  margin-bottom: 8px;        /* distance above the tabs */
+  padding-bottom: 2px;        /* tiny inner gap so the bar isn’t clipped */
 }
 
 .earnings-grid {
