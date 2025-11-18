@@ -2,7 +2,7 @@
 .heatmap-container {
   position: relative;
   width: 100%;
-  height: calc(90vh - 140px); /* fits nicely between header and tabs */
+  height: calc(150vh - 140px); /* fits nicely between header and tabs */
   background-color: #050505;
   overflow: hidden;
 }
