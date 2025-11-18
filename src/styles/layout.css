@@ -1,4 +1,5 @@
 /* src/styles/layout.css */
+
 #app {
   min-height: 100vh;
   display: flex;
@@ -7,17 +8,14 @@
 
 #view-container {
   flex: 1;
-
-  /* Fallback bottom padding */
-  padding: 8px 8px 70px;
-
-  /* Leave extra room for the taller tab bar + safe area */
-  padding-bottom: calc(70px + env(safe-area-inset-bottom));
+  padding: 8px 8px 0; /* no bottom padding here; handled per-tab */
 }
 
+/* Each tab view fills the area above the tab bar */
 .tab-view {
   display: none;
   height: 100%;
+  padding-bottom: calc(56px + env(safe-area-inset-bottom)); /* room for tabs */
 }
 
 .tab-view.active {
@@ -37,8 +35,9 @@
   margin-bottom: 4px;
 }
 
-/* Allow vertical scrolling only on the earnings tab */
+/* Earnings tab: its own scroll and smaller bottom padding */
 #earnings-view {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
 }
