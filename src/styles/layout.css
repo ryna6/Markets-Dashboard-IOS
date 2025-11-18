@@ -71,10 +71,7 @@
   top: 0;
   left: 0;
   right: 0;
-
-  /* Leave a gap at the bottom so the scrollbar sits above the tabs */
   bottom: calc(40px + env(safe-area-inset-bottom));
-
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
