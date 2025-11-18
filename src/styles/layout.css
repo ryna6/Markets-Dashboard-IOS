@@ -63,5 +63,5 @@
   overflow-y: auto;
   overflow-x: hidden; /* prevent the whole tab (incl. toolbar) from scrolling horizontally */
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(40px + env(safe-area-inset-bottom));
+  padding-bottom: calc(36px + env(safe-area-inset-bottom));
 }
