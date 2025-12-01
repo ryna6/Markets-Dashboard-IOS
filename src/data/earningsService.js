@@ -9,7 +9,7 @@ import { IMPORTANT_TICKERS } from './importantTickers.js';
 const MIN_MARKET_CAP = 10; 
 
 // Also cap the total number of earnings shown in a week as a secondary safety.
-const MAX_EARNINGS_COUNT = 20;
+const MAX_EARNINGS_COUNT = 30;
 
 const EARNINGS_REFRESH_MINUTES = 60 * 24; // at most once/day per week
 
