@@ -12,6 +12,11 @@ export function initSp500Heatmap() {
   const lastUpdatedEl = container.querySelector('.last-updated');
   const refreshBtn = container.querySelector('.sp500-refresh-btn');
 
+  // ---- Toggle this to compare layouts quickly ----
+  // true  -> use crypto-style constrained treemap for S&P
+  // false -> use default row-fill treemap for S&P
+  const USE_CONSTRAINED_SP500_LAYOUT = true;
+
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
       // Clear BOTH S&P and Sector caches to keep them in sync
@@ -21,12 +26,11 @@ export function initSp500Heatmap() {
     });
   }
 
-  // One-time short retry used to fill in market caps/logos after quotes
-  // are cached (helps avoid Finnhub rate limiting on initial open).
+  // Follow-up refresh: fills in caps/logos after quotes cached (reduces Finnhub 429)
   let followUpTimer = null;
 
   async function refresh() {
-    const timeframe = '1D'; // S&P only shows 1D now
+    const timeframe = '1D'; // S&P shows 1D
     try {
       const data = await getSp500Data();
       const { symbols, quotes, marketCaps, logos } = data;
@@ -39,14 +43,12 @@ export function initSp500Heatmap() {
             ? (marketCaps[sym.toUpperCase()] ?? marketCaps[sym])
             : null,
           changePct1D: q.changePct1D,
-          // 1W unused here; heatmap uses 1D because timeframe='1D'
-          logoUrl: logos ? logos[sym.toUpperCase()] || logos[sym] : null,
+          logoUrl: logos ? (logos[sym.toUpperCase()] ?? logos[sym]) : null,
         };
       });
 
-      // If market caps are still missing for some symbols, schedule a short
-      // follow-up refresh (about 1 minute) so profile fetches can happen
-      // after the quote burst has settled (avoids hitting rate limits).
+      // If caps are missing, schedule a short follow-up refresh so profile fetch
+      // can happen after the quote burst settles.
       const missingCaps = symbols.filter((sym) => {
         const key = sym.toUpperCase();
         const cap = marketCaps ? (marketCaps[key] ?? marketCaps[sym]) : null;
@@ -60,7 +62,26 @@ export function initSp500Heatmap() {
         }, 70 * 1000);
       }
 
-      renderHeatmap(heatmapContainer, tiles, timeframe);
+      if (USE_CONSTRAINED_SP500_LAYOUT) {
+        // Apply the crypto-style layout algorithm (strip flipping) to S&P:
+        // - No forced top strip (that's crypto/BTC-specific)
+        // - Make ALL symbols "priority" so the anti-thin-strip rule always applies
+        const prioritySymbols = symbols.map((s) => String(s).toUpperCase());
+
+        renderHeatmap(heatmapContainer, tiles, timeframe, {
+          mode: 'crypto',
+          prioritySymbols,
+          // Starting point: S&P has many names; keep this slightly lower than crypto
+          // so it doesn't over-flip and create overly chunky blocks.
+          // If you still see thin strips -> increase (0.70 -> 0.76 -> 0.82)
+          minPriorityTextScale: 0.70,
+          // forceTopFullWidthSymbol: undefined (do NOT set)
+        });
+      } else {
+        // Original S&P layout
+        renderHeatmap(heatmapContainer, tiles, timeframe);
+      }
+
       renderLastUpdatedLine(
         lastUpdatedEl,
         data.lastQuotesFetch,
@@ -72,9 +93,6 @@ export function initSp500Heatmap() {
     }
   }
 
-  // Initial render
   refresh();
-
-  // Auto-refresh every 10 minutes
   setInterval(refresh, 10 * 60 * 1000);
 }
