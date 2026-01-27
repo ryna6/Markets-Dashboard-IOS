@@ -175,7 +175,7 @@ function draw(container) {
 
     // Decide whether to show text based on tile scale
     // If scale < 0.6 → only logo; otherwise logo + symbol + %
-    const showText = scale >= 0.6;
+    const showText = scale >= 0.8;
 
     const symbolHtml = showText
       ? `<div class="tile-symbol">${tile.symbol}</div>`
