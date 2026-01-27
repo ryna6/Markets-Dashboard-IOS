@@ -8,6 +8,7 @@ const FINNHUB_KEYS = {
 
   sp500: 'd4d73mhr01qovljoddigd4d73mhr01qovljoddj0',
   sectors: 'd5s6af9r01qoo9r2t3a0d5s6af9r01qoo9r2t3ag',
+  companies: 'd5s6jg1r01qoo9r2ukugd5s6jg1r01qoo9r2ukv0',
 };
 
 const CG_KEY = 'CG-3Vngf8kaoQdxDXjrg1jUJyYB';
