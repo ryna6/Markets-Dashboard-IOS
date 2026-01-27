@@ -16,19 +16,20 @@ export function initCryptoHeatmap() {
   const tfKey = TIMEFRAME_STORAGE_KEYS.crypto;
   const savedTf =
     (tfKey && localStorage.getItem(tfKey)) || TIMEFRAMES.ONE_DAY;
+
   let currentTimeframe =
     savedTf === TIMEFRAMES.ONE_WEEK ? TIMEFRAMES.ONE_WEEK : TIMEFRAMES.ONE_DAY;
 
   if (dropdown) {
     dropdown.value = currentTimeframe;
     dropdown.addEventListener('change', () => {
-      const value = dropdown.value === TIMEFRAMES.ONE_WEEK
-        ? TIMEFRAMES.ONE_WEEK
-        : TIMEFRAMES.ONE_DAY;
+      const value =
+        dropdown.value === TIMEFRAMES.ONE_WEEK
+          ? TIMEFRAMES.ONE_WEEK
+          : TIMEFRAMES.ONE_DAY;
+
       currentTimeframe = value;
-      if (tfKey) {
-        localStorage.setItem(tfKey, value);
-      }
+      if (tfKey) localStorage.setItem(tfKey, value);
       refresh();
     });
   }
@@ -40,8 +41,13 @@ export function initCryptoHeatmap() {
     });
   }
 
+  // Priority coins: these should not get shoved into a tiny strip where text is cramped.
+  // Smaller coins can fall back to logo-only.
+  const CRYPTO_PRIORITY = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'TRX', 'DOGE', 'ADA'];
+
   async function refresh() {
     const tf = currentTimeframe;
+
     try {
       const data = await getCryptoData();
       const { items, lastFetch, error } = data;
@@ -55,21 +61,21 @@ export function initCryptoHeatmap() {
         logoUrl: c.logoUrl || null,
       }));
 
-      renderHeatmap(heatmapContainer, tiles, tf);
+      renderHeatmap(heatmapContainer, tiles, tf, {
+        mode: 'crypto',
+        forceTopFullWidthSymbol: 'BTC',
+        prioritySymbols: CRYPTO_PRIORITY,
+        // This is the legibility threshold (measuredContent * scale).
+        // Higher = stronger protection from thin strips.
+        minPriorityTextScale: 0.78,
+      });
+
       renderLastUpdatedLine(lastUpdatedEl, lastFetch, tf, error);
     } catch (err) {
-      renderLastUpdatedLine(
-        lastUpdatedEl,
-        null,
-        currentTimeframe,
-        err.message
-      );
+      renderLastUpdatedLine(lastUpdatedEl, null, currentTimeframe, err.message);
     }
   }
 
-  // Initial render
   refresh();
-
-  // Auto-refresh every 5 minutes
   setInterval(refresh, 5 * 60 * 1000);
 }
