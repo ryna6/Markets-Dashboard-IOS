@@ -1,14 +1,14 @@
 // src/data/earningsService.js
 import { apiClient } from './apiClient.js';
 import { STORAGE_KEYS } from './constants.js';
-import { toEstIso, getCurrentWeekRangeEst, isOlderThanMinutes, } from './timezone.js';
+import { toEstIso, getCurrentWeekRangeEst, isOlderThanMinutes } from './timezone.js';
 import { getCompanyProfile } from './companyService.js';
 import { IMPORTANT_TICKERS } from './importantTickers.js';
 
-// Market cap threshold: only show companies above this.
-const MIN_MARKET_CAP = 10; 
+// Market cap threshold: only show companies above this (Finnhub profile2 marketCap is typically in billions)
+const MIN_MARKET_CAP = 10;
 
-// Also cap the total number of earnings shown in a week as a secondary safety.
+// Cap the total number of earnings shown in a week (mobile-friendly)
 const MAX_EARNINGS_COUNT = 30;
 
 const EARNINGS_REFRESH_MINUTES = 60 * 24; // at most once/day per week
@@ -21,6 +21,7 @@ let earningsState = {
   error: null,
 };
 
+// ---------- cache ----------
 function loadCache() {
   const raw = localStorage.getItem(STORAGE_KEYS.earningsCache);
   if (!raw) return;
@@ -43,6 +44,7 @@ function saveCache() {
 
 loadCache();
 
+// ---------- helpers ----------
 function makeWeekKey(mondayIso) {
   const d = new Date(mondayIso);
   const year = d.getUTCFullYear();
@@ -65,35 +67,63 @@ function weekdayNameFromDate(dateStr) {
   const d = new Date(dateStr + 'T12:00:00Z');
   const dayIdx = d.getUTCDay(); // 0=Sun..6=Sat
   switch (dayIdx) {
-    case 1:
-      return 'Monday';
-    case 2:
-      return 'Tuesday';
-    case 3:
-      return 'Wednesday';
-    case 4:
-      return 'Thursday';
-    case 5:
-      return 'Friday';
-    default:
-      return null;
+    case 1: return 'Monday';
+    case 2: return 'Tuesday';
+    case 3: return 'Wednesday';
+    case 4: return 'Thursday';
+    case 5: return 'Friday';
+    default: return null;
   }
 }
 
 function sessionFromHour(hour) {
-  if (!hour) return 'AMC'; // default
-  const norm = hour.toLowerCase();
+  if (!hour) return 'AMC';
+  const norm = String(hour).toLowerCase();
   if (norm === 'bmo') return 'BMO';
   if (norm === 'amc') return 'AMC';
   return 'AMC';
 }
 
-// Optionally, a simple no-throttle profile fetch.
-// If you want throttling, we can enhance this later.
-async function fetchProfilesForSymbols(symbolSet) {
+// NY date string YYYY-MM-DD (no UTC surprises)
+function fmtNYDateYYYYMMDD(dateObj) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+  }).format(dateObj);
+}
+
+// De-dupe earnings rows (Finnhub can repeat)
+function dedupeEntries(entries) {
+  const seen = new Set();
+  const out = [];
+  for (const e of entries) {
+    const sym = String(e?.symbol || '').toUpperCase();
+    const key = `${sym}|${e?.date || ''}|${String(e?.hour || '')}`;
+    if (!sym || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...e, symbol: sym });
+  }
+  return out;
+}
+
+// IMPORTANT_TICKERS rank map (lower index = more important/bigger)
+const IMPORTANT_SET = new Set(IMPORTANT_TICKERS.map((t) => String(t).toUpperCase()));
+const IMPORTANT_RANK = new Map(
+  IMPORTANT_TICKERS.map((t, idx) => [String(t).toUpperCase(), idx])
+);
+
+function rankOf(symbol) {
+  const key = String(symbol || '').toUpperCase();
+  const r = IMPORTANT_RANK.get(key);
+  return typeof r === 'number' ? r : 1e9;
+}
+
+// Fetch profiles ONLY for a small set (top 30 symbols), with mild throttling
+async function fetchProfilesForSymbolsLimited(symbols) {
   const profiles = {};
-  for (const symbol of symbolSet) {
+  for (const symbol of symbols) {
     try {
+      // tiny delay reduces 429 risk on mobile/WKWebView
+      await new Promise((r) => setTimeout(r, 80));
       const p = await getCompanyProfile(symbol);
       profiles[symbol] = p;
     } catch (_) {
@@ -110,11 +140,15 @@ async function fetchProfilesForSymbols(symbolSet) {
 
 async function refreshEarningsIfNeeded() {
   const { monday, friday } = getCurrentWeekRangeEst();
-  const fromIso = monday.toISOString().slice(0, 10);
-  const toIso = friday.toISOString().slice(0, 10);
+
+  // Use NY-local YYYY-MM-DD for the API query (not UTC slice)
+  const fromIso = fmtNYDateYYYYMMDD(monday);
+  const toIso = fmtNYDateYYYYMMDD(friday);
+
   const weekKey = makeWeekKey(fromIso);
   const nowIso = toEstIso(new Date());
 
+  // Cache freshness check (NY)
   if (
     earningsState.weekKey === weekKey &&
     earningsState.lastFetch &&
@@ -133,6 +167,7 @@ async function refreshEarningsIfNeeded() {
 
   let raw;
   try {
+    // Single Finnhub call (your goal)
     raw = await apiClient.finnhub(
       `/calendar/earnings?from=${fromIso}&to=${toIso}`
     );
@@ -142,15 +177,11 @@ async function refreshEarningsIfNeeded() {
     throw err;
   }
 
-  const allEntries = raw.earningsCalendar || [];
+  const allEntries = dedupeEntries(raw.earningsCalendar || []);
 
-  // STEP 1: filter entries by your important ticker universe
-  const importantSet = new Set(
-    IMPORTANT_TICKERS.map((t) => t.toUpperCase())
-  );
-
+  // Filter to your important universe (your goal)
   const filteredEntries = allEntries.filter((e) =>
-    importantSet.has((e.symbol || '').toUpperCase())
+    IMPORTANT_SET.has(String(e.symbol || '').toUpperCase())
   );
 
   if (!filteredEntries.length) {
@@ -162,15 +193,34 @@ async function refreshEarningsIfNeeded() {
     return;
   }
 
-  // STEP 2: fetch profiles for these filtered symbols to get marketCap/logo
-  const symbolSet = new Set(
-    filteredEntries.map((e) => (e.symbol || '').toUpperCase())
-  );
-  const profiles = await fetchProfilesForSymbols(symbolSet);
+  // ---- KEY CHANGE ----
+  // Select "top 30" BEFORE doing any profile calls, using IMPORTANT_TICKERS rank.
+  // This prevents rate-limited profiles from nuking marketCap sorting.
+  const ranked = [...filteredEntries].sort((a, b) => {
+    const ra = rankOf(a.symbol);
+    const rb = rankOf(b.symbol);
+    if (ra !== rb) return ra - rb;
+    // tie-breaker: earlier date first, then BMO before AMC
+    const da = String(a.date || '');
+    const db = String(b.date || '');
+    if (da !== db) return da.localeCompare(db);
+    return String(a.hour || '').localeCompare(String(b.hour || ''));
+  });
 
-  // STEP 3: further filter by market cap (if we have it)
-  const decorated = filteredEntries.map((e) => {
-    const key = (e.symbol || '').toUpperCase();
+  // Take a small buffer so MIN_MARKET_CAP filter doesn’t shrink the week too much
+  const PRESELECT = Math.max(MAX_EARNINGS_COUNT, 40);
+  const preselected = ranked.slice(0, PRESELECT);
+
+  // Profiles only for preselected symbols (<= 40 calls, usually cached)
+  const symbolsNeeded = Array.from(
+    new Set(preselected.map((e) => String(e.symbol || '').toUpperCase()))
+  );
+
+  const profiles = await fetchProfilesForSymbolsLimited(symbolsNeeded);
+
+  // Apply cap filter (keep unknowns), then cap to 30
+  const decorated = preselected.map((e) => {
+    const key = String(e.symbol || '').toUpperCase();
     const profile = profiles[key] || {
       symbol: key,
       name: key,
@@ -180,21 +230,22 @@ async function refreshEarningsIfNeeded() {
     return { entry: e, profile };
   });
 
-  let filteredByCap = decorated.filter((d) => {
+  const filteredByCap = decorated.filter((d) => {
     const cap = d.profile.marketCap;
-    if (cap == null || Number.isNaN(cap)) {
-      // If cap unknown, you can decide whether to keep or drop.
-      // Here we keep unknowns so you don't silently miss big names.
-      return true;
-    }
+    if (cap == null || Number.isNaN(cap)) return true; // keep unknowns
     return cap >= MIN_MARKET_CAP;
   });
 
-  // STEP 4: sort by marketCap descending and cap the total count for the week
-  filteredByCap.sort(
-    (a, b) =>
-      (b.profile.marketCap || 0) - (a.profile.marketCap || 0)
-  );
+  // Final ordering: IMPORTANT rank first (so big names always show),
+  // not marketCap (which can be null under rate limits)
+  filteredByCap.sort((a, b) => {
+    const ra = rankOf(a.entry.symbol);
+    const rb = rankOf(b.entry.symbol);
+    if (ra !== rb) return ra - rb;
+    const ca = typeof a.profile.marketCap === 'number' ? a.profile.marketCap : -1;
+    const cb = typeof b.profile.marketCap === 'number' ? b.profile.marketCap : -1;
+    return cb - ca;
+  });
 
   const finalList = filteredByCap.slice(0, MAX_EARNINGS_COUNT);
 
@@ -207,7 +258,7 @@ async function refreshEarningsIfNeeded() {
     const session = sessionFromHour(e.hour);
 
     grouped[dayName][session].push({
-      symbol: e.symbol,
+      symbol: String(e.symbol || '').toUpperCase(),
       companyName: profile.name,
       logo: profile.logo,
       date: e.date,
@@ -242,9 +293,7 @@ export async function getWeeklyEarnings() {
 export function resetEarningsCache() {
   try {
     localStorage.removeItem(STORAGE_KEYS.earningsCache);
-  } catch (_) {
-    // ignore storage errors
-  }
+  } catch (_) {}
   earningsState = {
     weekKey: null,
     dataByDay: null,
@@ -253,4 +302,3 @@ export function resetEarningsCache() {
     error: null,
   };
 }
-
