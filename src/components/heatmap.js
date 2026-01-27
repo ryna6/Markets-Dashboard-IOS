@@ -7,11 +7,16 @@
 // We keep the last tiles/timeframe per container and re-render on resize.
 const HEATMAP_STATE = new WeakMap();
 
-// iOS/WKWebView can report a transient viewport size during first paint
-// (address bar settling). To prevent a brief "skinny tiles" flash, only
-// draw after the container size is stable for a couple RAF frames.
+// iOS/WKWebView can report a transient viewport size during first paint.
+// To avoid a brief "skinny tiles" flash, wait for stable size for 2 RAF frames.
 const STABLE_FRAMES_REQUIRED = 2;
 const SIZE_EPS_PX = 0.5;
+
+// Content fitting (logo + symbol + %).
+// This doesn't change tile area, but it prevents clipping by scaling content
+// down when tiles are short.
+const CONTENT_MIN_HEIGHT_PX = 46;
+const CONTENT_MIN_WIDTH_PX = 70;
 
 // tiles: [{ symbol, label?, marketCap?, changePct1D, changePct1W, logoUrl? }]
 export function renderHeatmap(container, tiles, timeframe) {
@@ -68,12 +73,12 @@ function draw(container) {
   const timeframe = state.timeframe;
 
   // If the container is hidden (display:none) or not laid out yet, it will be 0x0.
-  // Don't render (avoids the "long tile" bug); ResizeObserver will trigger when it becomes visible.
+  // Don't render; ResizeObserver will trigger when it becomes visible.
   const { width: pxW, height: pxH } = container.getBoundingClientRect();
   if (!pxW || !pxH || pxW < 2 || pxH < 2) return;
 
   // Wait until the container size is stable across a couple RAF frames.
-  // This avoids a brief wrong aspect layout on iOS during initial viewport settling.
+  // This avoids a wrong initial aspect on iOS during viewport settling.
   const prevW = state._lastW;
   const prevH = state._lastH;
   const changed =
@@ -96,7 +101,6 @@ function draw(container) {
   } else {
     state._stableFrames = (state._stableFrames || 0) + 1;
     state._stabilizeTries = 0;
-
     if (state._stableFrames < STABLE_FRAMES_REQUIRED) {
       scheduleDraw(container);
       return;
@@ -104,33 +108,25 @@ function draw(container) {
   }
 
   container.innerHTML = '';
+  if (!tiles.length) return;
 
-  // Filter out anything without a positive market cap
-  const valid = tiles.filter(
-    (t) => typeof t.marketCap === 'number' && t.marketCap > 0
-  );
+  // IMPORTANT: don't drop tiles if marketCap is missing.
+  // On first open, Finnhub rate limits can temporarily prevent some market caps/logos
+  // from loading. We fall back to weight=1 so every symbol still renders.
+  const nodes = tiles
+    .map((t) => {
+      const cap =
+        typeof t.marketCap === 'number' && t.marketCap > 0 ? t.marketCap : 1;
+      return { tile: t, weight: cap };
+    })
+    .filter((n) => n && typeof n.weight === 'number' && n.weight > 0);
 
-  if (!valid.length) {
-    return;
-  }
+  if (!nodes.length) return;
 
-  const totalCap = valid
-    .map((t) => t.marketCap)
-    .reduce((a, b) => a + b, 0);
-
-  if (!totalCap) return;
-
-  const nodes = valid.map((t) => ({
-    tile: t,
-    weight: t.marketCap,
-  }));
-
-  // Ordered "row" treemap:
-  // - largest tiles start at top-left
-  // - fill left-to-right across the top row
-  // - then move to the next row (top-to-bottom)
-  // This matches typical market heatmaps and avoids super-tall columns in portrait.
-  const rects = computeRowTreemap(nodes, pxW, pxH);
+  // Squarify treemap (keeps near-square rectangles and naturally avoids tiny-height rows).
+  // Largest starts at top-left; we force the first strip horizontal so the biggest names
+  // fill the top row left-to-right.
+  const rects = computeSquarifyTreemap(nodes, pxW, pxH);
 
   rects.forEach(({ tile, x, y, w, h }) => {
     const el = document.createElement('div');
@@ -155,35 +151,40 @@ function draw(container) {
     el.style.width = `${w * 100}%`;
     el.style.height = `${h * 100}%`;
 
-    // Use area as a proxy for how much content we can safely show inside
-    const area = w * h; // normalized area (0–1)
-    let scale = 0.4 + Math.sqrt(area) * 3;
+    const tileWidthPx = w * pxW;
+    const tileHeightPx = h * pxH;
+
+    // Area-based scale, but clamp by content-fit so we don't clip text on short tiles.
+    const areaNorm = w * h; // normalized (0–1)
+    let scale = 0.42 + Math.sqrt(areaNorm) * 3;
+    const fitScale = Math.min(
+      tileHeightPx / CONTENT_MIN_HEIGHT_PX,
+      tileWidthPx / CONTENT_MIN_WIDTH_PX
+    );
+    if (Number.isFinite(fitScale)) scale = Math.min(scale, fitScale);
 
     // Clamp so it never gets too tiny or huge
-    if (scale < 0.4) scale = 0.4;
+    if (scale < 0.32) scale = 0.32;
     if (scale > 3) scale = 3;
 
-    // Expose to CSS as a custom property (used by .tile-content)
     el.style.setProperty('--tile-scale', scale.toString());
 
     const pctDisplay =
       pct != null && !Number.isNaN(pct) ? `${pct.toFixed(2)}%` : '--';
 
-    const logoHtml = tile.logoUrl
+    // Logos eat vertical space; only show when the tile can comfortably fit it.
+    const showLogo =
+      !!tile.logoUrl &&
+      tileWidthPx >= 42 &&
+      tileHeightPx >= 42 &&
+      scale >= 0.55;
+
+    const logoHtml = showLogo
       ? `<img class="tile-logo" src="${tile.logoUrl}" alt="${tile.symbol} logo" />`
       : '';
 
-    // Decide whether to show text based on tile scale
-    // If scale < 0.6 → only logo; otherwise logo + symbol + %
-    const showText = scale >= 0.8;
-
-    const symbolHtml = showText
-      ? `<div class="tile-symbol">${tile.symbol}</div>`
-      : '';
-
-    const pctHtml = showText
-      ? `<div class="tile-pct">${pctDisplay}</div>`
-      : '';
+    const symbolHtml = `<div class="tile-symbol">${tile.symbol}</div>`;
+    const pctHtml = `<div class="tile-pct">${pctDisplay}</div>`;
 
     el.innerHTML = `
       <div class="tile-content">
@@ -207,23 +208,20 @@ function pctColorClass(pct) {
 }
 
 /**
- * Ordered "row" treemap (a squarify-style row builder, but with a fixed
- * top-to-bottom / left-to-right scan order).
+ * Squarify treemap.
+ * - Preserves descending order (largest first) so the top-left starts with the biggest.
+ * - Automatically alternates between horizontal/vertical strips based on remaining rectangle.
+ * - First strip is forced horizontal so the largest names fill the top row left-to-right.
  *
- * - nodes: [{ tile, weight }]
- * - containerW/H are in pixels
- *
- * Returns: [{ tile, x, y, w, h }] where x/y/w/h are normalized (0–1).
+ * nodes: [{ tile, weight }]
+ * returns: [{ tile, x, y, w, h }] with x/y/w/h normalized (0–1)
  */
-function computeRowTreemap(nodes, containerW, containerH) {
-  const totalWeight = nodes
-    .map((n) => n.weight)
-    .reduce((a, b) => a + b, 0);
+function computeSquarifyTreemap(nodes, containerW, containerH) {
+  const totalWeight = nodes.reduce((s, n) => s + (n.weight || 0), 0);
   if (!nodes.length || totalWeight <= 0) return [];
 
-  // Sort descending so biggest tiles start at top-left.
+  // Largest first
   const sorted = [...nodes].sort((a, b) => b.weight - a.weight);
-
   const totalArea = containerW * containerH;
   const items = sorted.map((n) => ({
     tile: n.tile,
@@ -231,84 +229,100 @@ function computeRowTreemap(nodes, containerW, containerH) {
   }));
 
   const rectsPx = [];
+  let rect = { x: 0, y: 0, w: containerW, h: containerH };
   let row = [];
-  let y = 0;
+  let firstStrip = true;
 
-  const w = containerW;
-
-  function rowArea(r) {
-    return r.reduce((s, it) => s + it.area, 0);
-  }
-
-  function worstAspect(r) {
-    if (!r.length) return Infinity;
-    const sum = rowArea(r);
+  const sumArea = (arr) => arr.reduce((s, it) => s + it.area, 0);
+  const worst = (arr, side) => {
+    if (!arr.length) return Infinity;
+    const s = sumArea(arr);
     let min = Infinity;
     let max = 0;
-    for (const it of r) {
+    for (const it of arr) {
       if (it.area < min) min = it.area;
       if (it.area > max) max = it.area;
     }
-    // Same formula as classic squarify, but with fixed strip width = containerW.
-    const sum2 = sum * sum;
-    const w2 = w * w;
-    return Math.max((w2 * max) / sum2, sum2 / (w2 * min));
-  }
+    const s2 = s * s;
+    const side2 = side * side;
+    return Math.max((side2 * max) / s2, s2 / (side2 * min));
+  };
 
-  function layoutRow(r, isLastRow) {
-    const sum = rowArea(r);
-    if (sum <= 0) return;
+  const layoutRow = (arr) => {
+    const s = sumArea(arr);
+    if (s <= 0) return;
 
-    // Nominal row height from area.
-    let rowH = sum / w;
-    if (isLastRow) {
-      // Avoid tiny floating-point gaps at the bottom.
-      rowH = Math.max(0, containerH - y);
-      if (!rowH) return;
-    }
+    // Force the first strip horizontal (top row), then squarify normally.
+    const horizontal = firstStrip || rect.w >= rect.h;
 
-    let x = 0;
-    for (let i = 0; i < r.length; i++) {
-      const it = r[i];
-      let rectW = it.area / rowH;
-
-      // Make the last tile in the row fill any rounding remainder.
-      if (i === r.length - 1) {
-        rectW = Math.max(0, w - x);
+    if (horizontal) {
+      const rowH = s / rect.w;
+      let x = rect.x;
+      for (let i = 0; i < arr.length; i++) {
+        const it = arr[i];
+        let w = it.area / rowH;
+        if (i === arr.length - 1) {
+          // fill remainder to avoid rounding gaps
+          w = Math.max(0, rect.x + rect.w - x);
+        }
+        rectsPx.push({ tile: it.tile, x, y: rect.y, w, h: rowH });
+        x += w;
       }
-
-      rectsPx.push({
-        tile: it.tile,
-        x,
-        y,
-        w: rectW,
-        h: rowH,
-      });
-      x += rectW;
+      rect = {
+        x: rect.x,
+        y: rect.y + rowH,
+        w: rect.w,
+        h: Math.max(0, rect.h - rowH),
+      };
+    } else {
+      const rowW = s / rect.h;
+      let y = rect.y;
+      for (let i = 0; i < arr.length; i++) {
+        const it = arr[i];
+        let h = it.area / rowW;
+        if (i === arr.length - 1) {
+          h = Math.max(0, rect.y + rect.h - y);
+        }
+        rectsPx.push({ tile: it.tile, x: rect.x, y, w: rowW, h });
+        y += h;
+      }
+      rect = {
+        x: rect.x + rowW,
+        y: rect.y,
+        w: Math.max(0, rect.w - rowW),
+        h: rect.h,
+      };
     }
-    y += rowH;
-  }
 
-  for (const it of items) {
+    firstStrip = false;
+  };
+
+  let i = 0;
+  while (i < items.length) {
+    const it = items[i];
     if (!row.length) {
       row.push(it);
+      i += 1;
       continue;
     }
 
-    const currentWorst = worstAspect(row);
-    const nextWorst = worstAspect([...row, it]);
+    const side = Math.min(rect.w, rect.h);
+    const currentWorst = worst(row, side);
+    const nextWorst = worst([...row, it], side);
 
     if (nextWorst <= currentWorst) {
       row.push(it);
+      i += 1;
     } else {
-      layoutRow(row, false);
-      row = [it];
+      layoutRow(row);
+      row = [];
+      // Don't increment i; retry adding it to the next row.
     }
   }
 
-  if (row.length) layoutRow(row, true);
+  if (row.length) layoutRow(row);
 
-  // Convert px rects -> normalized coordinates.
+  // Normalize
   return rectsPx.map((r) => ({
     tile: r.tile,
     x: r.x / containerW,
