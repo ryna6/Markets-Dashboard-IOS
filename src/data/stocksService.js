@@ -81,7 +81,8 @@ async function refreshQuotesIfNeeded() {
   for (const symbol of symbols) {
     try {
       const data = await apiClient.finnhub(
-        `/quote?symbol=${encodeURIComponent(symbol)}`
+        `/quote?symbol=${encodeURIComponent(symbol)}`,
+        { keyName: 'sp500' }
       );
 
       const price = data.c;
