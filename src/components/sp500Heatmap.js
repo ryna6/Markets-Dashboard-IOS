@@ -74,7 +74,7 @@ export function initSp500Heatmap() {
           // Starting point: S&P has many names; keep this slightly lower than crypto
           // so it doesn't over-flip and create overly chunky blocks.
           // If you still see thin strips -> increase (0.70 -> 0.76 -> 0.82)
-          minPriorityTextScale: 0.5,
+          minPriorityTextScale: 0.4,
           // forceTopFullWidthSymbol: undefined (do NOT set)
         });
       } else {
