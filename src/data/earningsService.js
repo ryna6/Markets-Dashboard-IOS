@@ -6,7 +6,7 @@ import { getCompanyProfile } from './companyService.js';
 import { IMPORTANT_TICKERS } from './importantTickers.js';
 
 // Market cap threshold: only show companies above this (Finnhub profile2 marketCap is typically in billions)
-const MIN_MARKET_CAP = 10;
+const MIN_MARKET_CAP = 5;
 
 // Cap the total number of earnings shown in a week (mobile-friendly)
 const MAX_EARNINGS_COUNT = 30;
