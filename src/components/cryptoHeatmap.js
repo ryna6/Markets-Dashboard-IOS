@@ -67,7 +67,7 @@ export function initCryptoHeatmap() {
         prioritySymbols: CRYPTO_PRIORITY,
         // This is the legibility threshold (measuredContent * scale).
         // Higher = stronger protection from thin strips.
-        minPriorityTextScale: 1.0,
+        minPriorityTextScale: 1.5,
       });
 
       renderLastUpdatedLine(lastUpdatedEl, lastFetch, tf, error);
