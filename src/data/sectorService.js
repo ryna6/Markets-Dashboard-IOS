@@ -22,17 +22,17 @@ const SECTOR_LIST = [
 
 // Static weights for treemap sizing
 const SECTOR_WEIGHTS = {
-  XLK: 34.0,
-  XLF: 13.8,
-  XLY: 10.4,
-  XLC: 9.9,
-  XLV: 8.8,
-  XLI: 8.6,
-  XLP: 5.2,
-  XLE: 3.0,
-  XLU: 2.5,
-  XLRE: 2.0,
-  XLB: 1.9,
+  XLK: 34.43,
+  XLF: 13.40,
+  XLY: 10.41,
+  XLC: 10.58,
+  XLV: 9.59,
+  XLI: 8.16,
+  XLP: 4.71,
+  XLE: 2.81,
+  XLU: 2.25,
+  XLRE: 1.83,
+  XLB: 1.83,
 };
 
 // Clean up old history key from previous versions
