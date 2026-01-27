@@ -6,8 +6,8 @@ const FINNHUB_KEYS = {
   // Used when no keyName is provided
   default: 'd4d73mhr01qovljoddigd4d73mhr01qovljoddj0',
 
-  sp500: 'd4d73mhr01qovljoddigd4d73mhr01qovljoddj0',
-  sectors: 'd5s6af9r01qoo9r2t3a0d5s6af9r01qoo9r2t3ag',
+  sp500: 'd5s6af9r01qoo9r2t3a0d5s6af9r01qoo9r2t3ag',
+  sectors: 'd4d73mhr01qovljoddigd4d73mhr01qovljoddj0',
   companies: 'd5s6jg1r01qoo9r2ukugd5s6jg1r01qoo9r2ukv0',
 };
 
