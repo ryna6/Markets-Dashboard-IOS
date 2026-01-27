@@ -22,7 +22,6 @@ export function initSectorHeatmap() {
 
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
-      // Clear BOTH Sector and S&P caches
       resetSectorCache();
       resetSp500Cache();
       refresh();
@@ -30,15 +29,10 @@ export function initSectorHeatmap() {
   }
 
   async function refresh() {
-    const timeframe = '1D'; // Sectors only show 1D now
+    const timeframe = '1D';
     try {
-      const {
-        sectors,
-        quotes,
-        marketCaps,
-        lastQuotesFetch,
-        error,
-      } = await getSectorData();
+      const { sectors, quotes, marketCaps, lastQuotesFetch, error } =
+        await getSectorData();
 
       const tiles = sectors.map((s) => {
         const symbol = s.symbol;
@@ -55,25 +49,26 @@ export function initSectorHeatmap() {
           label: s.name,
           marketCap: cap,
           changePct1D: q.changePct1D,
-          // changePct1W unused
         };
       });
 
-      renderHeatmap(heatmapEl, tiles, timeframe);
+      // All sectors should remain readable -> constrain all strips
+      const sectorSymbols = sectors.map((s) => s.symbol);
+
+      renderHeatmap(heatmapEl, tiles, timeframe, {
+        mode: 'sectors',
+        prioritySymbols: sectorSymbols,
+        // If you still see super-short tiles, increase this (e.g. 0.78 → 0.84)
+        minPriorityTextScale: 0.78,
+      });
+
       renderLastUpdatedLine(lastUpdatedEl, lastQuotesFetch, timeframe, error);
     } catch (err) {
       console.error('Sector refresh error', err);
-      renderLastUpdatedLine(
-        lastUpdatedEl,
-        null,
-        '1D',
-        err.message
-      );
+      renderLastUpdatedLine(lastUpdatedEl, null, '1D', err.message);
     }
   }
 
-  // Initial paint
   refresh();
-  // Periodic refresh every 10 minutes
   setInterval(refresh, 10 * 60 * 1000);
 }
