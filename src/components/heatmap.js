@@ -1,31 +1,25 @@
 // src/components/heatmap.js
 
-// One heatmap instance (per container) needs to re-layout when:
-// - the tab becomes visible (display: none -> block)
-// - iOS Safari's viewport height changes (address bar show/hide)
-// - orientation/resize happens
-// We keep the last tiles/timeframe/options per container and re-render on resize.
 const HEATMAP_STATE = new WeakMap();
 
-// iOS Safari/WKWebView can report transient sizes during first paint (address bar settling).
-// To avoid a brief wrong layout, only draw after the container size is stable for a couple frames.
 const STABLE_FRAMES_REQUIRED = 2;
 const SIZE_EPS_PX = 0.5;
 
-// Default content-fit heuristics (in px, at scale=1). Conservative.
-const DEFAULT_BASE_CONTENT_HEIGHT_PX = 46; // logo (<=16) + 2 text lines + gaps
-const DEFAULT_BASE_CONTENT_WIDTH_PX = 70;  // enough for symbol + %
+const DEFAULT_BASE_CONTENT_HEIGHT_PX = 46;
+const DEFAULT_BASE_CONTENT_WIDTH_PX = 70;
 
 const DEFAULT_MIN_PRIORITY_TEXT_SCALE = 0.78;
 
-// tiles: [{ symbol, label?, marketCap?, changePct1D, changePct1W, logoUrl? }]
-// options (optional):
-//  {
-//    mode: 'default' | 'crypto',
-//    prioritySymbols: string[] (crypto: symbols that should keep text visible when possible)
-//    forceTopFullWidthSymbol: string (crypto: e.g., 'BTC')
-//    minPriorityTextScale: number (0-1), default 0.78
-//  }
+/**
+ * tiles: [{ symbol, label?, marketCap?, changePct1D, changePct1W, logoUrl? }]
+ * options (optional):
+ *  {
+ *    mode: 'default' | 'crypto',
+ *    prioritySymbols: string[],
+ *    forceTopFullWidthSymbol: string, // e.g. 'BTC'
+ *    minPriorityTextScale: number     // e.g. 0.78 (increase if still too short)
+ *  }
+ */
 export function renderHeatmap(container, tiles, timeframe, options = {}) {
   if (!container) return;
 
@@ -75,12 +69,13 @@ function draw(container) {
   const tiles = Array.isArray(state.tiles) ? state.tiles : [];
   const timeframe = state.timeframe;
   const options = state.options || {};
+
   const mode = options.mode === 'crypto' ? 'crypto' : 'default';
 
   const { width: pxW, height: pxH } = container.getBoundingClientRect();
   if (!pxW || !pxH || pxW < 2 || pxH < 2) return;
 
-  // Wait for stable size (prevents iOS "skinny tiles" flash on first paint)
+  // wait for stable size (iOS first-paint / address bar settling)
   const prevW = state._lastW;
   const prevH = state._lastH;
   const changed =
@@ -112,8 +107,7 @@ function draw(container) {
   container.innerHTML = '';
   if (!tiles.length) return;
 
-  // Always show tiles even if marketCap is missing (fallback weight=1).
-  // This prevents "only half show up" during partial data fetch.
+  // show all tiles even if marketCap missing (fallback weight=1)
   const nodes = tiles
     .map((t) => {
       const cap =
@@ -124,12 +118,14 @@ function draw(container) {
 
   if (!nodes.length) return;
 
-  const cfg = getRenderConfig(container, state, options);
+  // IMPORTANT: Default heatmaps (S&P / Sectors) go back to strict row-fill.
+  // Crypto uses the special constrained treemap.
+  const cfg = mode === 'crypto' ? getRenderConfig(container, state, options) : null;
 
   const rects =
     mode === 'crypto'
       ? computeCryptoTreemap(nodes, pxW, pxH, cfg)
-      : computeSquarifyTreemap(nodes, pxW, pxH, { forceFirstStripHorizontal: true });
+      : computeRowTreemap(nodes, pxW, pxH); // <-- row-fill L->R, top->bottom
 
   rects.forEach(({ tile, x, y, w, h }) => {
     const el = document.createElement('div');
@@ -144,9 +140,7 @@ function draw(container) {
         ? fallback
         : null;
 
-    const colorClass = pctColorClass(pct);
-    el.className = `heatmap-tile ${colorClass}`;
-
+    el.className = `heatmap-tile ${pctColorClass(pct)}`;
     el.style.left = `${x * 100}%`;
     el.style.top = `${y * 100}%`;
     el.style.width = `${w * 100}%`;
@@ -155,18 +149,21 @@ function draw(container) {
     const tileWidthPx = w * pxW;
     const tileHeightPx = h * pxH;
 
-    // Compute scale: area-based, clamped by content fit.
+    // area-based scale
     const areaNorm = w * h;
     let scale = 0.42 + Math.sqrt(areaNorm) * 3;
-
-    const fitScale = Math.min(
-      tileHeightPx / cfg.baseContentHeightPx,
-      tileWidthPx / cfg.baseContentWidthPx
-    );
-    if (Number.isFinite(fitScale)) scale = Math.min(scale, fitScale);
-
     if (scale < 0.32) scale = 0.32;
     if (scale > 3) scale = 3;
+
+    // Default: let CSS handle scaling; Crypto: clamp by content fit
+    if (mode === 'crypto' && cfg) {
+      const fitScale = Math.min(
+        tileHeightPx / cfg.baseContentHeightPx,
+        tileWidthPx / cfg.baseContentWidthPx
+      );
+      if (Number.isFinite(fitScale)) scale = Math.min(scale, fitScale);
+      if (scale < 0.32) scale = 0.32;
+    }
 
     el.style.setProperty('--tile-scale', scale.toString());
 
@@ -174,45 +171,39 @@ function draw(container) {
       pct != null && !Number.isNaN(pct) ? `${pct.toFixed(2)}%` : '--';
 
     const sym = String(tile.symbol || '').toUpperCase();
-    const isPriority = cfg.prioritySymbols.has(sym);
 
-    // CRYPTO CONTENT RULES:
-    // - Priority coins: show text (symbol + %). Logo shown only if it won't cramp.
-    // - Non-priority coins: logo-only by default; show text only if tile is genuinely big.
+    // CONTENT RULES
     let showText = false;
-    if (mode === 'crypto') {
+    let showLogo = false;
+
+    if (mode === 'crypto' && cfg) {
+      const isPriority = cfg.prioritySymbols.has(sym);
+
       if (isPriority) {
         showText = true;
       } else {
+        // small coins -> logo only unless tile is really big
         showText =
           scale >= 1.05 &&
           tileHeightPx >= cfg.baseContentHeightPx * 0.95 &&
           tileWidthPx >= cfg.baseContentWidthPx * 0.95;
       }
-    } else {
-      showText = scale >= 0.6;
-    }
 
-    const hasLogo = !!tile.logoUrl;
-
-    // Logo policy:
-    // - Crypto priority: show logo only if there's comfortable room; otherwise text wins.
-    // - Crypto non-priority: logo is the fallback content; show if it fits at all.
-    let showLogo = false;
-    if (hasLogo) {
-      if (mode === 'crypto') {
+      if (tile.logoUrl) {
         if (isPriority) {
-          // Require a bit more height so logo doesn't steal the vertical budget
+          // Only show logo if it doesn't cramp text
           showLogo =
-            tileHeightPx >= cfg.baseContentHeightPx * 0.90 &&
+            tileHeightPx >= cfg.baseContentHeightPx * 0.9 &&
             tileWidthPx >= 22 &&
             scale >= cfg.minPriorityTextScale;
         } else {
           showLogo = tileHeightPx >= 18 && tileWidthPx >= 18;
         }
-      } else {
-        showLogo = tileHeightPx >= 18 && tileWidthPx >= 18 && scale >= 0.5;
       }
+    } else {
+      // Default (S&P / Sectors): keep normal behavior
+      showText = scale >= 0.6;
+      showLogo = !!tile.logoUrl && tileHeightPx >= 18 && tileWidthPx >= 18 && scale >= 0.5;
     }
 
     const logoHtml =
@@ -234,6 +225,102 @@ function draw(container) {
     container.appendChild(el);
   });
 }
+
+function pctColorClass(pct) {
+  if (pct == null || Number.isNaN(pct)) return 'pct-neutral';
+  if (pct > 3) return 'pct-strong-pos';
+  if (pct > 0.5) return 'pct-pos';
+  if (pct < -3) return 'pct-strong-neg';
+  if (pct < -0.5) return 'pct-neg';
+  return 'pct-neutral';
+}
+
+/**
+ * DEFAULT layout for S&P and Sectors:
+ * strict row-fill: top-to-bottom, left-to-right,
+ * largest starts at top-left, fills row then next row.
+ */
+function computeRowTreemap(nodes, containerW, containerH) {
+  const totalWeight = nodes.reduce((s, n) => s + (n.weight || 0), 0);
+  if (!nodes.length || totalWeight <= 0) return [];
+
+  const sorted = [...nodes].sort((a, b) => b.weight - a.weight);
+  const totalArea = containerW * containerH;
+
+  const items = sorted.map((n) => ({
+    tile: n.tile,
+    area: (n.weight / totalWeight) * totalArea,
+  }));
+
+  const rectsPx = [];
+  let y = 0;
+  const w = containerW;
+
+  const rowArea = (r) => r.reduce((s, it) => s + it.area, 0);
+
+  // Classic squarify-style row building, but always lays as horizontal rows (L->R),
+  // stacking rows top->bottom.
+  const worstAspect = (r) => {
+    if (!r.length) return Infinity;
+    const sum = rowArea(r);
+    let min = Infinity;
+    let max = 0;
+    for (const it of r) {
+      if (it.area < min) min = it.area;
+      if (it.area > max) max = it.area;
+    }
+    const sum2 = sum * sum;
+    const w2 = w * w;
+    return Math.max((w2 * max) / sum2, sum2 / (w2 * min));
+  };
+
+  const layoutRow = (r, isLastRow) => {
+    const sum = rowArea(r);
+    if (sum <= 0) return;
+
+    let rowH = sum / w;
+    if (isLastRow) {
+      rowH = Math.max(0, containerH - y);
+      if (!rowH) return;
+    }
+
+    let x = 0;
+    for (let i = 0; i < r.length; i++) {
+      const it = r[i];
+      let rectW = it.area / rowH;
+      if (i === r.length - 1) rectW = Math.max(0, w - x);
+      rectsPx.push({ tile: it.tile, x, y, w: rectW, h: rowH });
+      x += rectW;
+    }
+    y += rowH;
+  };
+
+  let row = [];
+  for (const it of items) {
+    if (!row.length) {
+      row.push(it);
+      continue;
+    }
+    const currentWorst = worstAspect(row);
+    const nextWorst = worstAspect([...row, it]);
+    if (nextWorst <= currentWorst) row.push(it);
+    else {
+      layoutRow(row, false);
+      row = [it];
+    }
+  }
+  if (row.length) layoutRow(row, true);
+
+  return rectsPx.map((r) => ({
+    tile: r.tile,
+    x: r.x / containerW,
+    y: r.y / containerH,
+    w: r.w / containerW,
+    h: r.h / containerH,
+  }));
+}
+
+// ---------- CRYPTO-ONLY CONFIG + LAYOUT ----------
 
 function getRenderConfig(container, state, options) {
   const prioritySymbols = new Set(
@@ -269,7 +356,6 @@ function getRenderConfig(container, state, options) {
   };
 }
 
-// Measure intrinsic size of (logo + symbol + %) at scale=1.
 function measureBaseContentSize(container) {
   try {
     const probe = document.createElement('div');
@@ -301,143 +387,23 @@ function measureBaseContentSize(container) {
       : probe.getBoundingClientRect();
 
     probe.remove();
-
-    // Add a small safety margin for padding/gaps.
     return { w: rect.width + 8, h: rect.height + 6 };
   } catch (_) {
     return null;
   }
 }
 
-function pctColorClass(pct) {
-  if (pct == null || Number.isNaN(pct)) return 'pct-neutral';
-  if (pct > 3) return 'pct-strong-pos';
-  if (pct > 0.5) return 'pct-pos';
-  if (pct < -3) return 'pct-strong-neg';
-  if (pct < -0.5) return 'pct-neg';
-  return 'pct-neutral';
-}
-
 /**
- * Squarify treemap (classic market heatmap look).
- */
-function computeSquarifyTreemap(nodes, containerW, containerH, opts = {}) {
-  const totalWeight = nodes.reduce((s, n) => s + (n.weight || 0), 0);
-  if (!nodes.length || totalWeight <= 0) return [];
-
-  const sorted = [...nodes].sort((a, b) => b.weight - a.weight);
-
-  const totalArea = containerW * containerH;
-  const items = sorted.map((n) => ({
-    tile: n.tile,
-    area: (n.weight / totalWeight) * totalArea,
-  }));
-
-  const rectsPx = [];
-  let rect = { x: 0, y: 0, w: containerW, h: containerH };
-  let row = [];
-  let firstStrip = !!opts.forceFirstStripHorizontal;
-
-  const sumArea = (arr) => arr.reduce((s, it) => s + it.area, 0);
-
-  const worst = (arr, side) => {
-    if (!arr.length) return Infinity;
-    const s = sumArea(arr);
-    let min = Infinity;
-    let max = 0;
-    for (const it of arr) {
-      if (it.area < min) min = it.area;
-      if (it.area > max) max = it.area;
-    }
-    const s2 = s * s;
-    const side2 = side * side;
-    return Math.max((side2 * max) / s2, s2 / (side2 * min));
-  };
-
-  const layoutRow = (arr) => {
-    const s = sumArea(arr);
-    if (s <= 0 || rect.w <= 0 || rect.h <= 0) return;
-
-    const horizontal = firstStrip || rect.w >= rect.h;
-
-    if (horizontal) {
-      const rowH = s / rect.w;
-      let x = rect.x;
-      for (let i = 0; i < arr.length; i++) {
-        const it = arr[i];
-        let w = it.area / rowH;
-        if (i === arr.length - 1) w = Math.max(0, rect.x + rect.w - x);
-        rectsPx.push({ tile: it.tile, x, y: rect.y, w, h: rowH });
-        x += w;
-      }
-      rect = { x: rect.x, y: rect.y + rowH, w: rect.w, h: Math.max(0, rect.h - rowH) };
-    } else {
-      const rowW = s / rect.h;
-      let y = rect.y;
-      for (let i = 0; i < arr.length; i++) {
-        const it = arr[i];
-        let h = it.area / rowW;
-        if (i === arr.length - 1) h = Math.max(0, rect.y + rect.h - y);
-        rectsPx.push({ tile: it.tile, x: rect.x, y, w: rowW, h });
-        y += h;
-      }
-      rect = { x: rect.x + rowW, y: rect.y, w: Math.max(0, rect.w - rowW), h: rect.h };
-    }
-
-    firstStrip = false;
-  };
-
-  let i = 0;
-  while (i < items.length) {
-    const it = items[i];
-    if (!row.length) {
-      row.push(it);
-      i += 1;
-      continue;
-    }
-
-    const side = Math.min(rect.w, rect.h);
-    const currentWorst = worst(row, side);
-    const nextWorst = worst([...row, it], side);
-
-    if (nextWorst <= currentWorst) {
-      row.push(it);
-      i += 1;
-    } else {
-      layoutRow(row);
-      row = [];
-    }
-  }
-
-  if (row.length) layoutRow(row);
-
-  return rectsPx.map((r) => ({
-    tile: r.tile,
-    x: r.x / containerW,
-    y: r.y / containerH,
-    w: r.w / containerW,
-    h: r.h / containerH,
-  }));
-}
-
-/**
- * Crypto treemap:
- * - Force BTC (or configured symbol) as full-width top strip.
- * - AFTER BTC, prefer VERTICAL COLUMNS when the remaining region is short vertically
- *   (this is the core fix for the "tiny last row" created by BTC dominance).
- * - If a strip containing a priority symbol would be too thin (row height or column width),
- *   flip orientation so priority coins get enough room for logo + symbol + %.
- *
- * The effect: BTC top row, then ETH tends to become the left anchor (column),
- * and smaller coins collect to the right instead of being forced into a thin bottom strip.
+ * Crypto treemap (your “perfect” behavior):
+ * - Force BTC as full-width top strip
+ * - Flip strips when priority coins would land in too-thin strips
+ * - Prefer columns when remaining region is short vertically
  */
 function computeCryptoTreemap(nodes, containerW, containerH, cfg) {
   const totalWeight = nodes.reduce((s, n) => s + (n.weight || 0), 0);
   if (!nodes.length || totalWeight <= 0) return [];
 
   const totalArea = containerW * containerH;
-
-  // Largest first
   const sorted = [...nodes].sort((a, b) => b.weight - a.weight);
 
   let items = sorted.map((n) => ({
@@ -448,7 +414,6 @@ function computeCryptoTreemap(nodes, containerW, containerH, cfg) {
   const rectsPx = [];
   let rect = { x: 0, y: 0, w: containerW, h: containerH };
 
-  // Force BTC full-width top strip if present
   if (cfg.forceTopFullWidthSymbol) {
     const idx = items.findIndex(
       (it) => String(it.tile?.symbol || '').toUpperCase() === cfg.forceTopFullWidthSymbol
@@ -505,7 +470,6 @@ function computeCryptoTreemap(nodes, containerW, containerH, cfg) {
   const stripHasPriority = (arr) =>
     arr.some((it) => cfg.prioritySymbols.has(String(it.tile?.symbol || '').toUpperCase()));
 
-  // Greedy strip build (squarify rule)
   const buildStrip = (remaining, side) => {
     const strip = [];
     let i = 0;
@@ -573,10 +537,8 @@ function computeCryptoTreemap(nodes, containerW, containerH, cfg) {
   while (remaining.length && rect.w > 0 && rect.h > 0 && safeGuard < 300) {
     safeGuard += 1;
 
-    // IMPORTANT CRYPTO HEURISTIC:
-    // Prefer columns when the remaining region is short vertically (rect.h < rect.w).
-    // This is what prevents "tiny last rows" after BTC dominates height.
-    let horizontal = rect.h >= rect.w; // true => row, false => column
+    // Prefer columns when remaining region is short vertically
+    let horizontal = rect.h >= rect.w;
 
     const side = Math.min(rect.w, rect.h);
     let strip = buildStrip(remaining, side);
@@ -585,19 +547,11 @@ function computeCryptoTreemap(nodes, containerW, containerH, cfg) {
     const hasPriority = stripHasPriority(strip);
 
     if (horizontal) {
-      // Would-be row height
       const stripH = sumArea(strip) / rect.w;
-      if (hasPriority && stripH < cfg.minPriorityStripHeightPx) {
-        // Too short for priority content → use a column instead
-        horizontal = false;
-      }
+      if (hasPriority && stripH < cfg.minPriorityStripHeightPx) horizontal = false;
     } else {
-      // Would-be column width
       const stripW = sumArea(strip) / rect.h;
-      if (hasPriority && stripW < cfg.minPriorityStripWidthPx) {
-        // Too narrow for priority content → use a row instead
-        horizontal = true;
-      }
+      if (hasPriority && stripW < cfg.minPriorityStripWidthPx) horizontal = true;
     }
 
     rect = layoutStrip(strip, rect, horizontal);
