@@ -9,7 +9,7 @@ import { IMPORTANT_TICKERS } from './importantTickers.js';
 const MIN_MARKET_CAP = 5;
 
 // Cap the total number of earnings shown in a week (mobile-friendly)
-const MAX_EARNINGS_COUNT = 30;
+const MAX_EARNINGS_COUNT = 35;
 
 const EARNINGS_REFRESH_MINUTES = 60 * 24; // at most once/day per week
 
