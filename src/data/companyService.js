@@ -40,7 +40,8 @@ export async function getCompanyProfile(symbol) {
   }
 
   const data = await apiClient.finnhub(
-    `/stock/profile2?symbol=${encodeURIComponent(key)}`
+    `/stock/profile2?symbol=${encodeURIComponent(key)}`,
+    { keyName: 'sp500' }
   );
 
   // Finnhub field: marketCapitalization (number; units may be billions)
