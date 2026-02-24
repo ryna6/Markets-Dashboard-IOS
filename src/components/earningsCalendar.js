@@ -41,12 +41,15 @@ function renderGrid(container, dataByDay) {
 
   DAYS.forEach(day => {
     const col = document.createElement('div');
-    col.className = 'earnings-day-column';
+    col.className = 'earnings-day';
 
     const dayHeader = document.createElement('div');
     dayHeader.className = 'earnings-day-header';
     dayHeader.textContent = day;
     col.appendChild(dayHeader);
+
+    const dayList = document.createElement('div');
+    dayList.className = 'earnings-day-list';
 
     ['BMO', 'AMC'].forEach(session => {
       const section = document.createElement('div');
@@ -89,8 +92,10 @@ function renderGrid(container, dataByDay) {
       });
 
       section.appendChild(list);
-      col.appendChild(section);
+      dayList.appendChild(section);
     });
+
+    col.appendChild(dayList);
 
     container.appendChild(col);
   });

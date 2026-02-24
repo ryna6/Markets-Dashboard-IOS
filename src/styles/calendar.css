@@ -2,19 +2,27 @@
 .earnings-scroll {
   width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  flex: 1;
+  min-height: 0;
 }
 
 .earnings-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(170px, 1fr));
   gap: 8px;
+  min-height: 0;
+  height: 100%;
 }
 
-.earnings-day-column {
+.earnings-day {
   background-color: #111;
   border-radius: 6px;
   padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .earnings-day-header {
@@ -27,6 +35,14 @@
   color: #aaa;
   margin-top: 4px;
   margin-bottom: 2px;
+}
+
+.earnings-day-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .earnings-company-list {
