@@ -5,7 +5,7 @@
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   flex: 1;
-  min-height: 1900;
+  min-height: 2000;
 }
 
 .earnings-grid {
