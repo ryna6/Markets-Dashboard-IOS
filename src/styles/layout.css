@@ -71,3 +71,8 @@
 #earnings-view .last-updated {
   flex: 0 0 auto;
 }
+
+#earnings-view .toolbar,
+#earnings-view .last-updated {
+  flex: 0 0 auto;
+}
