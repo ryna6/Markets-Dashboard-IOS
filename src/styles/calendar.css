@@ -5,7 +5,17 @@
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   flex: 1;
-  min-height: 2000;
+  min-height: 0;
+}
+
+/* Keep horizontal swipe/scroll, but hide scrollbar chrome */
+.earnings-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.earnings-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .earnings-grid {
