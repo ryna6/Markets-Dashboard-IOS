@@ -12,7 +12,7 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(170px, 1fr));
   gap: 8px;
-  min-height: 2000;
+  min-height: 0;
   height: 100%;
 }
 
