@@ -10,7 +10,7 @@
 
 .earnings-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(160px, 1fr));
+  grid-template-columns: repeat(5, minmax(170px, 1fr));
   gap: 8px;
   min-height: 2000;
   height: 100%;
