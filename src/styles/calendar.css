@@ -5,12 +5,12 @@
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   flex: 1;
-  min-height: 0;
+  min-height: 2000;
 }
 
 .earnings-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(170px, 1fr));
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
   gap: 8px;
   min-height: 2000;
   height: 100%;
