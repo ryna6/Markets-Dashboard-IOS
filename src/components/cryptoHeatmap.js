@@ -18,14 +18,17 @@ export function initCryptoHeatmap() {
     (tfKey && localStorage.getItem(tfKey)) || TIMEFRAMES.ONE_DAY;
 
   let currentTimeframe =
-    savedTf === TIMEFRAMES.ONE_WEEK ? TIMEFRAMES.ONE_WEEK : TIMEFRAMES.ONE_DAY;
+    savedTf === TIMEFRAMES.ONE_WEEK || savedTf === TIMEFRAMES.ONE_MONTH
+      ? savedTf
+      : TIMEFRAMES.ONE_DAY;
 
   if (dropdown) {
     dropdown.value = currentTimeframe;
     dropdown.addEventListener('change', () => {
       const value =
-        dropdown.value === TIMEFRAMES.ONE_WEEK
-          ? TIMEFRAMES.ONE_WEEK
+        dropdown.value === TIMEFRAMES.ONE_WEEK ||
+        dropdown.value === TIMEFRAMES.ONE_MONTH
+          ? dropdown.value
           : TIMEFRAMES.ONE_DAY;
 
       currentTimeframe = value;
@@ -58,6 +61,7 @@ export function initCryptoHeatmap() {
         marketCap: c.marketCap,
         changePct1D: c.changePct1D,
         changePct1W: c.changePct1W,
+        changePct1M: c.changePct1M,
         logoUrl: c.logoUrl || null,
       }));
 

@@ -58,10 +58,16 @@
   margin-bottom: 4px;
 }
 
-/* Earnings tab: its own scroll and smaller bottom padding */
+/* Earnings tab layout keeps toolbar fixed while grid handles its own scrolling */
 #earnings-view {
-  overflow-y: auto;
-  overflow-x: hidden; /* prevent the whole tab (incl. toolbar) from scrolling horizontally */
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+
+#earnings-view .toolbar,
+#earnings-view .last-updated {
+  flex: 0 0 auto;
 }
