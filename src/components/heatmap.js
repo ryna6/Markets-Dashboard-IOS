@@ -14,7 +14,7 @@ const DEFAULT_MIN_PRIORITY_TEXT_SCALE = 0.78;
 /**
  * renderHeatmap(container, tiles, timeframe, options?)
  *
- * tiles: [{ symbol, label?, marketCap?, changePct1D, changePct1W, logoUrl? }]
+ * tiles: [{ symbol, label?, marketCap?, changePct1D, changePct1W, changePct1M?, logoUrl? }]
  *
  * options:
  *  {
@@ -151,8 +151,19 @@ function draw(container) {
   rects.forEach(({ tile, x, y, w, h }) => {
     const el = document.createElement('div');
 
-    const primary = timeframe === '1D' ? tile.changePct1D : tile.changePct1W;
-    const fallback = timeframe === '1D' ? tile.changePct1W : tile.changePct1D;
+    const primary =
+      timeframe === '1D'
+        ? tile.changePct1D
+        : timeframe === '1W'
+        ? tile.changePct1W
+        : tile.changePct1M;
+
+    const fallback =
+      timeframe === '1D'
+        ? tile.changePct1W ?? tile.changePct1M
+        : timeframe === '1W'
+        ? tile.changePct1D ?? tile.changePct1M
+        : tile.changePct1W ?? tile.changePct1D;
 
     const pct =
       primary != null && !Number.isNaN(primary)
