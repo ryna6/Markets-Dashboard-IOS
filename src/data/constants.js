@@ -3,6 +3,7 @@
 export const TIMEFRAMES = {
   ONE_DAY: '1D',
   ONE_WEEK: '1W',
+  ONE_MONTH: '1M',
 };
 
 export const STORAGE_KEYS = {

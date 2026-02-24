@@ -25,7 +25,7 @@ const DEFAULT_IDS = [
 ];
 
 let cryptoState = {
-  items: [],           // [{ id, symbol, name, price, marketCap, changePct1D, changePct1W, logoUrl }]
+  items: [],           // [{ id, symbol, name, price, marketCap, changePct1D, changePct1W, changePct1M, logoUrl }]
   lastFetch: null,
   status: 'idle',
   error: null,
@@ -74,7 +74,7 @@ async function refreshCryptoIfNeeded() {
     const data = await apiClient.coingecko(
       `/coins/markets?vs_currency=usd&ids=${encodeURIComponent(
         idsStr
-      )}&price_change_percentage=24h,7d&per_page=${DEFAULT_IDS.length}&page=1`
+      )}&price_change_percentage=24h,7d,30d&per_page=${DEFAULT_IDS.length}&page=1`
     );
 
     cryptoState.items = data.map((c) => ({
@@ -89,6 +89,7 @@ async function refreshCryptoIfNeeded() {
         c.price_change_percentage_24h ??
         null,
       changePct1W: c.price_change_percentage_7d_in_currency ?? null,
+      changePct1M: c.price_change_percentage_30d_in_currency ?? null,
       logoUrl: c.image || null,
     }));
 
